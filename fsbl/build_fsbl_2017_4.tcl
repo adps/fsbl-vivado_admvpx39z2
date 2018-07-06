@@ -14,7 +14,7 @@ sdk setws $workspace_dir
 cd $workspace_dir
 
 #Genreate hw, bsp and application projects
-sdk createhw -name $hw_proj -hwspec $fsbl_sources_dir/hdf/admvpx39z2_simple_sdcard_DPx1_usb.hdf
+sdk createhw -name $hw_proj -hwspec $fsbl_sources_dir/hdf/admvpx39z2_simple_sdcard_DP_usb.hdf
 sdk createbsp -name $bsp_proj -hwproject $hw_proj -proc psu_cortexa53_0 -os standalone -arch 64
 setlib -bsp $bsp_proj -lib xilffs
 setlib -bsp $bsp_proj -lib xilsecure
@@ -22,7 +22,11 @@ setlib -bsp $bsp_proj -lib xilpm
 setlib -bsp $bsp_proj -lib xilfpga
 updatemss -mss $bsp_proj/system.mss
 regenbsp -bsp $bsp_proj
-sdk createbsp -name $pmufw_bsp_proj -hwproject $hw_proj -mss ../sources/mss/pmu_system.mss
+sdk createbsp -name $pmufw_bsp_proj -hwproject $hw_proj -proc psu_pmu_0 -os standalone
+setlib -bsp $pmufw_bsp_proj -lib xilfpga
+setlib -bsp $pmufw_bsp_proj -lib xilsecure
+updatemss -mss $pmufw_bsp_proj/system.mss
+regenbsp -bsp $pmufw_bsp_proj
 sdk createapp -name $fsbl_proj -app {Zynq MP FSBL} -proc psu_cortexa53_0 -hwproject $hw_proj -bsp $bsp_proj -lang c
 sdk createapp -name $pmufw_proj -app {ZynqMP PMU Firmware} -proc psu_pmu_0 -hwproject $hw_proj -bsp $pmufw_bsp_proj -lang c
 
