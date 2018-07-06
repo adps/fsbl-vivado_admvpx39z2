@@ -1,0 +1,7 @@
+Switch settings:
+
+SW3-3: OFF
+
+SW4-5: OFF
+
+Other switch settings set as required by user.
