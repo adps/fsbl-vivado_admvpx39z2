@@ -114,7 +114,7 @@ extern "C" {
 #define FSBL_DEBUG_DETAILED
 #endif
 
-//#define XFSBL_OVERRIDE_BOOT_MODE XFSBL_JTAG_BOOT_MODE
+//#define XFSBL_OVERRIDE_BOOT_MODE XFSBL_SD0_BOOT_MODE
 
 
 /**
@@ -139,8 +139,8 @@ extern "C" {
  *     - FSBL_FORCE_ENC_EXCLUDE_VAL Forcing encryption for every partition
  *       when ENC only bit is blown will be excluded.
  */
-//#define SD_PL_FSBL
 //#define MINIMAL_FSBL
+#define SD_PL_FSBL
 #ifdef MINIMAL_FSBL
 	#define FSBL_NAND_EXCLUDE_VAL			(1U)
 	#define FSBL_QSPI_EXCLUDE_VAL			(1U)
@@ -168,7 +168,7 @@ extern "C" {
 	#define FSBL_EARLY_HANDOFF_EXCLUDE_VAL	(1U)
 	#define FSBL_WDT_EXCLUDE_VAL			(1U)
 	#define FSBL_PERF_EXCLUDE_VAL			(1U)
-	#define FSBL_A53_TCM_ECC_EXCLUDE_VAL	(1U)
+	#define FSBL_A53_TCM_ECC_EXCLUDE_VAL	(0U)
 	#define FSBL_PL_CLEAR_EXCLUDE_VAL		(1U)
 	#define FSBL_USB_EXCLUDE_VAL			(1U)
 	#define FSBL_PROT_BYPASS_EXCLUDE_VAL	(1U)

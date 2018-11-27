@@ -72,6 +72,8 @@ extern "C" {
 
 /************************** Variable Definitions *****************************/
 
+//#define XFSBL_OVERRIDE_BOOT_MODE XFSBL_SD0_BOOT_MODE
+
 /**
  * Debug levels for FSBL
  */
@@ -80,7 +82,7 @@ extern "C" {
 #define DEBUG_INFO	      (0x00000004U)    /* More debug information */
 #define DEBUG_DETAILED	      (0x00000008U)    /* More debug information */
 
-#define FSBL_DEBUG_DETAILED
+//#define FSBL_DEBUG_DETAILED
 
 #if defined (FSBL_DEBUG_DETAILED)
 #define XFsblDbgCurrentTypes ((DEBUG_DETAILED) | (DEBUG_INFO) | \

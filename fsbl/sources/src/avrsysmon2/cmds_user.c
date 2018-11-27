@@ -1,5 +1,7 @@
 #include "cmds.h"
 
+#include "../avrsysmon2_configs.h"
+
 CMD_FUNC( CmdServiceModeRequest )
 {
     if( nCmdLength < 2 )
@@ -36,6 +38,7 @@ CMD_FUNC( CmdVersionQuery )
     return true;
 }
 
+#ifdef FULL_CMDS_USER
 CMD_FUNC( CmdLoopback32x8 )
 {
     if( nCmdLength < 34 )
@@ -51,7 +54,7 @@ CMD_FUNC( CmdLoopback32x8 )
     }
     return true;
 }
-
+#endif
 CMD_FUNC( CmdGetProductID )
 {
     if( nCmdLength < 2 )

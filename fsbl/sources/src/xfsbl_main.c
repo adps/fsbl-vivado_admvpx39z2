@@ -62,11 +62,11 @@
 //#include "xdppsu_poll_example.h"
 //#include "xdppsu_intr_example.h"
 //#include "xdpdma_video_example.h"
-//#include "avrboot.h"
+#include "avrboot.h"
 //#include "fatbit.h"
 #include "xemacps.h"
 
-#pragma GCC optimize ("O0")
+//#pragma GCC optimize ("O0")
 
 /************************** Constant Definitions *****************************/
 
@@ -96,7 +96,7 @@ int main(void )
 	 */
 	u32 FsblStatus = XFSBL_SUCCESS;
 	u32 FsblStage = XFSBL_STAGE1;
-	u32 PartitionNum=0U;
+	u32 PartitionNum = 0U;
 	u32 EarlyHandoff = FALSE;
 #ifdef XFSBL_PERF
 	XTime tCur = 0;
@@ -128,6 +128,7 @@ int main(void )
 				} else {
 
 					EthernetPhyEnable(0xFF0C0000);
+					EthernetPhyEnable(0xFF0E0000);
 					/**
 					 *
 					 * Include the code for FSBL time measurements
@@ -157,6 +158,10 @@ int main(void )
 				 *  partition header
 				 */
 
+				//Small delay before trying to interact with the AVR to allow it to power up properly.
+				usleep(200000);
+				AVRBootCheck( BootCheckVPD );
+				AVRBootCheck( BootCheckNormal );
 				FsblStatus = XFsbl_BootDeviceInitAndValidate(&FsblInstance);
 				//AVRBootCheck( BootCheckVPD );
 				if ( (XFSBL_SUCCESS != FsblStatus) &&
@@ -174,8 +179,6 @@ int main(void )
 				    //emmcTest();
 					//XFsbl_Printf(DEBUG_PRINT_ALWAYS,"Running DP poll example\r\n");
 					//DpPsu_PollExample(&DpPsuInstance, DPPSU_DEVICE_ID);
-					//AVRBootCheck( BootCheckVPD );
-					//AVRBootCheck( BootCheckNormal );
 
 					FsblStage = XFSBL_STAGE4;
 				} else {
@@ -363,9 +366,9 @@ void XFsbl_PrintFsblBanner(void )
 	 */
 #if !defined(XFSBL_PERF) || defined(FSBL_DEBUG) || defined(FSBL_DEBUG_INFO) \
 			|| defined(FSBL_DEBUG_DETAILED)
-	XFsbl_Printf(DEBUG_PRINT_ALWAYS,
+	XFsbl_Printf(DEBUG_INFO,
                  "Xilinx Zynq MP First Stage Boot Loader \n\r");
-	XFsbl_Printf(DEBUG_PRINT_ALWAYS,
+	XFsbl_Printf(DEBUG_INFO,
                  "Release %d.%d   %s  -  %s\r\n",
                  SDK_RELEASE_YEAR, SDK_RELEASE_QUARTER,__DATE__,__TIME__);
 

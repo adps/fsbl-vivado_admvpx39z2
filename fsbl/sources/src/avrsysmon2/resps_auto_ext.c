@@ -2,6 +2,8 @@
 
 #include "xil_printf.h"
 
+#include "../avrsysmon2_configs.h"
+#ifdef FULL_RESPS_AUTO_EXT
 
 RESP_FUNC( Resp_AlarmTemperatureW )
 {
@@ -70,6 +72,7 @@ RESP_FUNC( Resp_AlarmVoltageC )
 		return false;
 	}
 }
+#endif
 
 RESP_FUNC( Resp_SensorUpdate )
 {
@@ -79,10 +82,6 @@ RESP_FUNC( Resp_SensorUpdate )
 		pData[*nProgress] = nByte;
 		(*nProgress)++;
 		*bFinished = false;
-		if( bEoT )
-		{
-			xil_printf("\r\nUnexpected EoT\r\n");
-		}
 		return !bEoT;
 	}
 	else
@@ -119,6 +118,7 @@ RESP_FUNC( Resp_VPDUpdate )
 	}
 }
 
+#ifdef FULL_RESPS_AUTO_EXT
 RESP_FUNC( Resp_Mez0ModuleUpdate )
 {
 	static unsigned char pData[256];
@@ -206,3 +206,5 @@ RESP_FUNC( Resp_Mez3ModuleUpdate )
 		return bEoT;
 	}
 }
+
+#endif

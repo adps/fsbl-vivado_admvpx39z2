@@ -15,6 +15,12 @@
 
 #include "cpp_types.h"
 
+#include "../avrsysmon2_configs.h"
+
+#ifdef DISABLE_OPTIMIZATION
+#pragma GCC optimize ("O0")
+#endif
+
 //enum _AVRSysMon_Responce
 //{
 //	// Auto Commands
@@ -263,25 +269,24 @@ AVRSysMon_Result AVRSysMon_PumpRX( AVRSysMon_Context* pContext, uint8_t nData, b
 
     if( (*pContext)->m_bInFrame && bSoH )
     {
-        xil_printf("SoH Seen inside frame!");
+        xil_printf("SoH Seen inside frame!\r\n");
         return AVRSysMon_ResultOK;
     }
 
     if( !((*pContext)->m_bInFrame || bSoH ) )
     {
-        xil_printf("Discarding data outside frame.");
+        xil_printf("Discarding data outside frame.\r\n");
         return AVRSysMon_ResultOK;
     }
 
     (*pContext)->m_bInFrame = ( (*pContext)->m_bInFrame | bSoH ) & !bEoT;
 
 
-
     if( bSoH )
     {
         if( (*pContext)->m_nRespProgress != 0 )
         {
-            xil_printf("Error progress was not zero when SoH detected.");
+            xil_printf("Error progress was not zero when SoH detected.\r\n");
         }
         else
         {
@@ -367,7 +372,7 @@ AVRSysMon_Result AVRSysMon_PumpRX( AVRSysMon_Context* pContext, uint8_t nData, b
 				((uint8_t*)(*pContext)->m_pCurrentRequest->m_pRXData)[(*pContext)->m_pCurrentRequest->m_nRXSize++] = nData;
 			}
 		}
-        bool bCmdOK = m_fptActive( (*pContext)->m_nRespProgress, nData, bEoT, &bFinished );
+        bool bCmdOK = m_fptActive( &((*pContext)->m_nRespProgress), nData, bEoT, &bFinished );
         if( bCmdOK )
         {
             if( bFinished )
@@ -596,6 +601,7 @@ AVRSysMon_Result AVRSysMon_Request(AVRSysMon_Context* pContext, AVRSysMon_Comman
 	CHECK_HANDLE_VALID( pContext );
 	pReq->_private.m_pNextReq = NULL;
     pReq->m_nRXSize = 0;
+    (*pContext)->m_nRespProgress = 0;
 	if( (*pContext)->m_pCurrentRequest != NULL )
 	{
 		(*pContext)->m_pCurrentRequest->_private.m_pNextReq = pReq;
@@ -667,9 +673,12 @@ AVRSysMon_Result AVRSysMon_CompleteReq( AVRSysMon_Context* pContext, AVRSysMon_C
 AVRSysMon_Result AVRSysMon_GetVPDData( AVRSysMon_Context* pContext, void* pData, size_t nMaxSize )
 {
 	CHECK_HANDLE_VALID( pContext );
-	if( (*pContext)->m_bVPDDataValid == 1 )
+	//if( (*pContext)->m_bVPDDataValid == 1 )
 	{
 		size_t nSize = ( nMaxSize < 256U ) ? nMaxSize : 256U;
+		int i=0;
+		for(i=0; i<32; i++)
+			xil_printf("[%d]: 0x%02x\n", i, (*pContext)->m_pVPDData[i]);
 		memcpy( pData, (*pContext)->m_pVPDData, nSize );
 		return AVRSysMon_ResultOK;
 	}

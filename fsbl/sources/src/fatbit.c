@@ -6,8 +6,6 @@
 #include <stdint.h>
 #include "xparameters.h"
 
-//#pragma GCC optimize ("O0")
-
 typedef int bool_t;
 
 u8 g_bFPGAProgrammed = 0;

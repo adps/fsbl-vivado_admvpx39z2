@@ -14,7 +14,7 @@ sdk setws $workspace_dir
 cd $workspace_dir
 
 #Genreate hw, bsp and application projects
-sdk createhw -name $hw_proj -hwspec $fsbl_sources_dir/hdf/admvpx39z2_simple_sdcard_DP_usb.hdf
+sdk createhw -name $hw_proj -hwspec $fsbl_sources_dir/hdf/admvpx39z2_emmc_sata_usb_dp.hdf
 sdk createbsp -name $bsp_proj -hwproject $hw_proj -proc psu_cortexa53_0 -os standalone -arch 64
 setlib -bsp $bsp_proj -lib xilffs
 setlib -bsp $bsp_proj -lib xilsecure

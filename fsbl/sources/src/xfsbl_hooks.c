@@ -97,6 +97,11 @@ u32 XFsbl_HookBeforeHandoff(u32 EarlyHandoff)
 	/**
 	 * Add the code here
 	 */
+	//Code from AR# 69533
+	XFsbl_Out32 (0XFE20C200, 0x02417);     /* USB3_0_XHCI_GUSB2PHYCFG_OFFSET= 0XFE20C200*/
+	XFsbl_Out32 (0xFF9D007C, 0x1); /*disable usb3.0 pipe3 clock and enable usb2.0 clock */
+	XFsbl_Out32 (0xFF9D0080, 0x1);  /*Pipe power present*/
+	XFsbl_Out32 (0xff5e00a8, 0x01000602); /*LPD switch to active the clock*/
 
 	return Status;
 }

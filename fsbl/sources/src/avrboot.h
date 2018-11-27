@@ -1,7 +1,7 @@
 #ifndef _AVRBOOT_H_
 #define _AVRBOOT_H_
 
-//#define AVRBOOT
+#define AVRBOOT
 
 typedef enum _EBootCheckType
 {

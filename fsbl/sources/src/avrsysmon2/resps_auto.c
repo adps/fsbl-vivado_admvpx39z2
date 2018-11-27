@@ -2,12 +2,14 @@
 
 #include "xil_printf.h"
 
+#include "../avrsysmon2_configs.h"
+
 RESP_FUNC( Resp_ServiceModeDetect )
 {
 	(nByte);
 	if( ( nProgress == 0 ) && bEoT )
     {
-        xil_printf("\r\nService Mode Detect\r\n");
+        //xil_printf("\r\nService Mode Detect\r\n");
         *bFinished = true;
         return true;
     }
@@ -24,7 +26,7 @@ RESP_FUNC( Resp_ApplicationModeDetect )
 	(nByte);
 	if( ( nProgress == 0 ) && bEoT )
     {
-        //xil_printf("\r\nApplication Mode Detect\r\n";
+        //xil_printf("\r\nApplication Mode Detect\r\n");
         *bFinished = true;
         return true;
     }
@@ -36,6 +38,7 @@ RESP_FUNC( Resp_ApplicationModeDetect )
     }
 }
 
+#ifdef FULL_RESPS_AUTO
 RESP_FUNC( Resp_FirmwareErrorDetect )
 {
 	(nByte);
@@ -52,3 +55,5 @@ RESP_FUNC( Resp_FirmwareErrorDetect )
 		return false;
 	}
 }
+
+#endif

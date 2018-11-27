@@ -2,6 +2,12 @@
 
 #include "xil_printf.h"
 
+#include "../avrsysmon2_configs.h"
+
+//#define DEBUG_RESPS
+
+#ifdef FULL_RESPS_USER_EXT
+
 RESP_FUNC( Resp_I2CRead )
 {
     static unsigned int nETC;
@@ -91,6 +97,7 @@ RESP_FUNC( Resp_InvokeProtection )
     }
     return false;
 }
+#endif
 
 RESP_FUNC( Resp_RequestVPDUpdate )
 {
@@ -104,6 +111,7 @@ RESP_FUNC( Resp_RequestVPDUpdate )
     return false;
 }
 
+#ifdef FULL_RESPS_USER_EXT
 RESP_FUNC( Resp_RequestMezUpdate )
 {
     if( *nProgress == 0 )
@@ -115,6 +123,7 @@ RESP_FUNC( Resp_RequestMezUpdate )
     }
     return false;
 }
+#endif
 
 //extern void PrintSensors( unsigned char* pPacket );
 
@@ -142,7 +151,10 @@ RESP_FUNC( Resp_RequestSensors )
         (*nProgress)++;
         *bFinished = true;
         //unsigned int nErrors = 0;
+#ifdef DEBUG_RESPS
+        xil_printf("Progress: %d\r\n", *nProgress);
         xil_printf("\r\nSensor Data RXed. Status: %u\r\n",(unsigned int)chStatus);
+#endif
 
         //PrintSensors( pData );
 
@@ -150,6 +162,7 @@ RESP_FUNC( Resp_RequestSensors )
     }
 }
 
+#ifdef FULL_RESPS_USER_EXT
 RESP_FUNC( Resp_RequestBlockBox )
 {
     static unsigned char pData[64];
@@ -174,12 +187,14 @@ RESP_FUNC( Resp_RequestBlockBox )
         (*nProgress)++;
         *bFinished = true;
 		//unsigned int nErrors = 0;
+#ifdef DEBUG_RESPS
         xil_printf("\r\nBlock Box Sensor Data RXed. Status: %u\r\n",(unsigned int)chStatus);
 		if( chStatus == 0 )
 		{
 			//PrintSensors( pData );
 		}
 		xil_printf("\r\n");
+#endif
 		return bEoT;
     }
 }
@@ -188,13 +203,16 @@ RESP_FUNC( Resp_ForceMezSupply )
 {
     if( *nProgress == 0 )
     {
+#ifdef DEBUG_RESPS
         xil_printf("\r\nRequest Force Mez Supply response: %u\r\n",(unsigned int)nByte);
+#endif
         (*nProgress)++;
         *bFinished = true;
         return bEoT;
     }
     return false;
 }
+#endif
 
 RESP_FUNC( Resp_RequestVPDData )
 {
@@ -220,11 +238,15 @@ RESP_FUNC( Resp_RequestVPDData )
         (*nProgress)++;
         *bFinished = true;
         //unsigned int nErrors = 0;
+#ifdef DEBUG_RESPS
+        xil_printf("Progress: %d\r\n", *nProgress);
         xil_printf("\r\nVPD Data RXed. Status: %u\r\n",(unsigned int)chStatus);
+#endif
         return bEoT;
     }
 }
 
+#ifdef FULL_RESPS_USER_EXT
 RESP_FUNC( Resp_RequestMezData )
 {
     static unsigned char pData[256];
@@ -249,7 +271,9 @@ RESP_FUNC( Resp_RequestMezData )
         (*nProgress)++;
         *bFinished = true;
         //unsigned int nErrors = 0;
+#ifdef DEBUG_RESPS
         xil_printf("\r\nMez Data RXed. Status: %u\r\n",(unsigned int)chStatus);
+#endif
         return bEoT;
     }
 }
@@ -283,6 +307,7 @@ RESP_FUNC( Resp_SetFrequency )
     case 4:
         pData[3] = nByte;
         (*nProgress)++;
+#ifdef DEBUG_RESPS
         if( chStatus == 0 )
         {
             xil_printf("\r\nSet Frequency Resp: %u\r\n", *((unsigned int*)&pData[0]));
@@ -291,6 +316,7 @@ RESP_FUNC( Resp_SetFrequency )
         {
             xil_printf("\r\nSet Frequency Resp Error: %u\r\n",(unsigned int)chStatus);
         }
+#endif
         *bFinished = true;
         return bEoT;
     }
@@ -326,6 +352,7 @@ RESP_FUNC( Resp_GetFrequency )
     case 4:
         pData[3] = nByte;
         (*nProgress)++;
+#ifdef DEBUG_RESPS
         if( chStatus == 0 )
         {
             xil_printf("\r\nGet Frequency Resp: %u\r\n", *((unsigned int*)&pData[0]));
@@ -334,6 +361,7 @@ RESP_FUNC( Resp_GetFrequency )
         {
             xil_printf("\r\nGet Frequency Resp Error: %u\r\n",(unsigned int)chStatus);
         }
+#endif
         *bFinished = true;
         return bEoT;
     }
@@ -344,7 +372,9 @@ RESP_FUNC( Resp_OverrideSensor )
 {
     if( *nProgress == 0 )
     {
+#ifdef DEBUG_RESPS
         xil_printf("\r\nRequest Sensor Value response: %u\r\n",(unsigned int)nByte);
+#endif
         (*nProgress)++;
         *bFinished = true;
         return bEoT;
@@ -383,6 +413,7 @@ RESP_FUNC( Resp_SetFrequencyEx )
 	case 4:
 		pData[3] = nByte;
 		(*nProgress)++;
+#ifdef DEBUG_RESPS
 		if( chStatus == 0 )
 		{
 			xil_printf("\r\nSet FrequencyEx Resp: %u\r\n", *((unsigned int*)&pData[0]));
@@ -391,6 +422,7 @@ RESP_FUNC( Resp_SetFrequencyEx )
 		{
 			xil_printf("\r\nSet FrequencyEx Resp Error: %u\r\n",(unsigned int)chStatus);
 		}
+#endif
 		*bFinished = true;
 		return bEoT;
 	}
@@ -426,6 +458,7 @@ RESP_FUNC( Resp_GetFrequencyEx )
 	case 4:
 		pData[3] = nByte;
 		(*nProgress)++;
+#ifdef DEBUG_RESPS
 		if( chStatus == 0 )
 		{
 			xil_printf("\r\nGet FrequencyEx Resp: %u\r\n", *((unsigned int*)&pData[0]));
@@ -434,8 +467,10 @@ RESP_FUNC( Resp_GetFrequencyEx )
 		{
 			xil_printf("\r\nGet FrequencyEx Resp Error: %u\r\n",(unsigned int)chStatus);
 		}
+#endif
 		*bFinished = true;
 		return bEoT;
 	}
 	return false;
 }
+#endif

@@ -1,5 +1,8 @@
 #include "resps.h"
 
+
+#include "../avrsysmon2_configs.h"
+
 RESP_FUNC( RespServiceMode )
 {
     if( *nProgress == 0 )
@@ -74,6 +77,7 @@ RESP_FUNC( RespVersion )
     return false;
 }
 
+#ifdef FULL_RESPS_USER
 RESP_FUNC( RespLoopback32x8 )
 {
     static unsigned char pData[32];
@@ -102,7 +106,7 @@ RESP_FUNC( RespLoopback32x8 )
         return bEoT;
     }
 }
-
+#endif
 RESP_FUNC( RespGetProductID )
 {
     static unsigned char pPID[4];

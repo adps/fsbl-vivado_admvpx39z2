@@ -38,10 +38,11 @@
 
 #ifdef AVRBOOT
 
+#include "avrsysmon2_configs.h"
 
-//#define _UART_DEBUG
-
+#ifdef DISABLE_OPTIMIZATION
 #pragma GCC optimize ("O0")
+#endif
 
 #define XFSBL_JTAG_BOOT_MODE		(0x0U)
 #define XFSBL_QSPI24_BOOT_MODE		(0x1U)
@@ -54,11 +55,6 @@
 #define XFSBL_SD1_LS_BOOT_MODE	    (0xEU)
 
 volatile u32* DATA_0_RO = (u32*)0xE000A060;
-
-EMemTypePart g_eMemPart = MT41K256M16;
-
-EBoardType g_eBoardType = BoardUnknown;
-EFPGAType g_eFPGAType = FPGAUnknown;
 
 struct SAVRStatus
 {
@@ -88,6 +84,8 @@ void PumpUARTInternal( AVRSysMon_Context* pContext, bool bFlush );
 
 AVRSysMon_Mode GetSysmonModePin( AVRSysMon_Context* pContext )
 {
+	return AVRSysMon_ModeApplication;
+
 	if( ( *DATA_0_RO & ( 1U << 14 ) ) == 0 )
 	{
 		return AVRSysMon_ModeService;
@@ -100,6 +98,8 @@ AVRSysMon_Mode GetSysmonModePin( AVRSysMon_Context* pContext )
 
 AVRSysMon_Alarm GetSysmonAlarmPin( AVRSysMon_Context* pContext )
 {
+	return AVRSysMon_AlarmNone;
+
 	if( ( *DATA_0_RO & ( 1U << 15 ) ) == 0 )
 	{
 		return AVRSysMon_AlarmActive;
@@ -148,7 +148,9 @@ void PumpUARTRxChar( AVRSysMon_Context* pContext, unsigned char nChar )
 		{
 			if( ( nChar == 0x10 ) || (nChar == 0x01) || (nChar == 0x04) )
 			{
+#ifdef _UART_DEBUG
 				xil_printf("\r\nIllegal character following escape from AVR 0x%02x.\r\n",(unsigned int)nChar);
+#endif
 			}
 			nChar = ~nChar;
 			bRXEscape = false;
@@ -169,7 +171,9 @@ void PumpUARTRxChar( AVRSysMon_Context* pContext, unsigned char nChar )
 #endif
 				if( !bCharBuffered )
 				{
+#ifdef _UART_DEBUG
 					xil_printf("\r\nEmpty frame detected!\r\n");
+#endif
 				}
 			}
 			if( bCharBuffered )
@@ -302,8 +306,10 @@ void PumpUARTInternal( AVRSysMon_Context* pContext, bool bFlush )
 			tRes = tEnd - tStart;
 			if( tRes > 100000000U )
 			{
+#ifdef _UART_DEBUG
 				xil_printf("\r\nNo data detected from AVR");
-				set_error(pContext, AVRSysMon_ResultTimeout);
+#endif
+				//set_error(pContext, AVRSysMon_ResultTimeout);
 				return AVRSysMon_ResultTimeout;
 			}
 		}
@@ -399,7 +405,10 @@ AVRSysMon_Result AVRSysMon_PumpReq( AVRSysMon_Context* pContext, AVRSysMon_Comma
 				}
 				break;
 				default:
+#ifdef _UART_DEBUG
 					xil_printf("\r\nUnexpected result.\r\n");
+#endif
+					break;
 					//CloseHandle( g_hComm );
 			}
 		}
@@ -415,8 +424,7 @@ AVRSysMon_Result AVRSysMon_PumpReq( AVRSysMon_Context* pContext, AVRSysMon_Comma
 	}
 	return AVRSysMon_ResultOK;
 }
-
-
+/*
 const char* GetDeviceString( uint16_t nDevice )
 {
 	switch( nDevice )
@@ -517,7 +525,7 @@ const char* GetSDRAMConfigSizeQSPI( uint8_t nSize )
 		return "       ";
 	}
 }
-
+*/
 const char* GetADVStatus( const uint8_t* pData, uintptr_t nOffSet, uint8_t nShift )
 {
 	uint8_t nData = 0xF & ( pData[nOffSet] >> nShift );
@@ -568,6 +576,7 @@ void AVRBootCheck( EBootCheckType eBootType )
 		xil_printf( "\x1b""[2J" ); // Erase the screen
 #endif
 
+#ifdef PRINT_ALPHADATA_BANNER
 		xil_printf( "\r\n" );
 		xil_printf( "\r\n                                                                        ");
 		xil_printf( "\r\n            @@@@@@@                                                     ");
@@ -584,8 +593,10 @@ void AVRBootCheck( EBootCheckType eBootType )
 		xil_printf( "\r\n @@@@@@@@@@@@       @@ @@ @@@@ @@   @  @ @@ @@    @@@@  @  @@  @@  @@ @@");
 		xil_printf( "\r\n    @@@@@@");
 		xil_printf( "\r\n" );
-		xil_printf( "\r\nAlpha Data Parallel Systems Ltd. ZynqMP FSBL Release 0.0.0.0" );
+		xil_printf( "\r\nAlpha Data Parallel Systems Ltd. ZynqMP FSBL Release 1.0.1.0" );
 		xil_printf( "\r\n" );
+		usleep(1000000);
+#endif
 	}
 
 	// Try opening the sysmon
@@ -594,20 +605,17 @@ void AVRBootCheck( EBootCheckType eBootType )
 
 	while(0)
 	{
-		if(!TestLoopback( &sSysMon, PumpUART, false ))
+		/*if(!TestLoopback( &sSysMon, PumpUART, false ))
 			xil_printf("\r\nAVR loopback failed");
 		else
-			xil_printf("\r\nAVR loopback passed");
-
-
+			xil_printf("\r\nAVR loopback passed");*/
 	}
 
-	//if( eBootType == BootCheckNormal )
-	if(0)
+	if( eBootType == BootCheckNormal )
 	{
 		// Get the firmware version numbers
 		u16 pVersion[4];
-		if(!CheckVersion( &sSysMon, PumpUART, false ))
+		if(!CheckVersion( &sSysMon, PumpUART, false, pVersion ))
 		{
 			xil_printf("\r\nFailed to get Version Data");
 			goto avr_error;
@@ -637,9 +645,11 @@ void AVRBootCheck( EBootCheckType eBootType )
 	}
 
 	// Get the VPD Data
+	volatile uint32_t pDataVPD32[256/4];
+	volatile uint8_t* pVPDData = (uint8_t*)(void*)pDataVPD32;
+	int count=0;
 	{
-		retryVPD:
-		if( !RequestVPD( &sSysMon, PumpUART ))
+		if( !RequestVPD( &sSysMon, PumpUART, pVPDData ))
 		{
 			xil_printf("\r\nFailed to get VPD Data");
 			usleep(1000000);
@@ -649,7 +659,6 @@ void AVRBootCheck( EBootCheckType eBootType )
 				uint8_t nByte = XUartPs_ReadReg(XPAR_XUARTPS_1_BASEADDR, XUARTPS_FIFO_OFFSET);
 				(void)(nByte);
 			}
-			goto retryVPD;
 			goto avr_error;
 		}
 		// Flush any current RX data
@@ -658,15 +667,19 @@ void AVRBootCheck( EBootCheckType eBootType )
 			uint8_t nByte = XUartPs_ReadReg(XPAR_XUARTPS_1_BASEADDR, XUARTPS_FIFO_OFFSET);
 			(void)(nByte);
 		}
+		//goto retryVPD;
 	}
 
-	uint32_t pDataVPD32[256/4];
-	uint8_t* pVPDData = (uint8_t*)(void*)pDataVPD32;
-	eResult = AVRSysMon_GetVPDData( &sSysMon, pVPDData, 256 );
+	EMemTypePart g_eMemPart = MT41K256M16;
+
+	EBoardType g_eBoardType = BoardUnknown;
+	EFPGAType g_eFPGAType = FPGAUnknown;
+
+	//eResult = AVRSysMon_GetVPDData( &sSysMon, pVPDData, 256 );
 	if( eBootType != BootCheckNormal )
 	{
 		SVpdAdmvpx39z2Rev1* pVPD = (SVpdAdmvpx39z2Rev1*)pVPDData;
-		u32 nPSRamSize = GetSDRAMConfigSizePSBytes( pVPD->m_nRamPSSize );
+		/*u32 nPSRamSize = GetSDRAMConfigSizePSBytes( pVPD->m_nRamPSSize );
 		switch( nPSRamSize  )
 		{
 		case  1024U * 1024U * 512U:
@@ -702,19 +715,19 @@ void AVRBootCheck( EBootCheckType eBootType )
 		default:
 			g_eFPGAType = FPGAUnknown;
 			break;
-		}
+		}*/
 		eResult = AVRSysMon_Close( &sSysMon );
 		if( !CheckAVRSysmonError( eResult ) ) goto avr_error;
-		goto avr_done;
+			goto avr_done;
 	}
 
 	// Request the sensor page (64-bytes for admxrc7k1 and later)
 	// Note this return requested data (not using automatically update page)
-	uint8_t* pSensorData[64];
+	uint8_t pSensorData[64];
 	{
 retrySensors:
-		if( !ReportSensors( &sSysMon, PumpUART, false ) ) goto retrySensors;
-		AVRSysMon_GetSensorData(&sSysMon, pSensorData, 64  );
+		if( !ReportSensors( &sSysMon, PumpUART, false, pSensorData ) ) goto retrySensors;
+		//AVRSysMon_GetSensorData(&sSysMon, pSensorData, 64  );
 	}
 
 
@@ -735,21 +748,21 @@ retrySensors:
 	SVpdAdmvpx39z2Rev1* pVPD = (SVpdAdmvpx39z2Rev1*)pVPDData;
 
 	uint8_t nSum = 0;
-	for( n = 0; n < sizeof( SVpdAdmvpx39z2Rev1 ) - 1; n++ )
+	for( n = 0; n < 0x50 - 1; n++ )
 	{
 		nSum += ((uint8_t*)pVPD)[n];
 	}
 	uint8_t nCheckSum = 0 - nSum;
 	if( pVPD->m_nCheckSum != nCheckSum )
 	{
-		xil_printf("\r\nVPD Checksum error!");
+		//xil_printf("\r\nVPD Checksum error!");
 	}
 	else
 	{
-		bool bP6Fitted 			= ( pVPD->m_nMods & 0x1 ) == 0;
-		bool bP4Fitted 			= ( pVPD->m_nMods & 0x2 ) == 0;
-		bool bMicroUSBFitted	= ( pVPD->m_nMods & 0x4 ) == 0;
-		bool bMicroSDFitted 	= ( pVPD->m_nMods & 0x8 ) == 0;
+		bool bP6Fitted 			= 0;
+		bool bP4Fitted 			= 0;
+		bool bMicroUSBFitted	= 0;
+		bool bMicroSDFitted 	= 0;
 
 		// String safety
 		pVPD->m_szFPGASpeed[3] = '\0';
@@ -757,7 +770,7 @@ retrySensors:
 
 
 
-		switch( pVPD->m_nBoardType )
+		/*switch( pVPD->m_nBoardType )
 		{
 		case 0x10F:
 			xil_printf("\r\n Board Type : ADM-XRC-7Z1       ");
@@ -771,7 +784,7 @@ retrySensors:
 			xil_printf("\r\n Board Type : Unknown           ");
 			//g_eBoardType = BoardUnknown;
 			break;
-		}
+		}*/
 		/*switch( pVPD->m_nFPGAType )
 		{
 		case 292:
@@ -783,7 +796,7 @@ retrySensors:
 		default:
 			g_eFPGAType = FPGAUnknown;
 			break;
-		}*/
+		}
 
 		xil_printf("Serial Number : %d", pVPD->m_nSerialNumber );
 		xil_printf("\r\n         P6 : %s", bP6Fitted ? "Fitted            " : "Not Fitted        " );
@@ -810,28 +823,29 @@ retrySensors:
 		xil_printf("    PL SDRAM1 : %s@%s", GetSDRAMConfigSizePL( pVPD->m_nRamPL1Size), GetSDRAMConfigSpeedPL( pVPD->m_nRamPL1MaxFreq ) );
 
 		xil_printf("\r\n");
+		*/
 	}
 
 	// Report analogue sensors
-	for( n = 0; g_p7z1Analog[n*2].m_szName != NULL; n++ )
+	for( n = 0; g_p9z2Analog[n*2].m_szName != NULL; n++ )
 	{
-		void* pData = (void*)(&pSensorData[g_p7z1Analog[n*2].m_nOffset]);
-		float fValue = g_p7z1Analog[n*2].m_fOffset + g_p7z1Analog[n*2].m_fScaleFactor * (float)*(uint16_t*)pData;
+		void* pData = (void*)(&pSensorData[g_p9z2Analog[n*2].m_nOffset]);
+		float fValue = g_p9z2Analog[n*2].m_fOffset + g_p9z2Analog[n*2].m_fScaleFactor * (float)*(uint16_t*)pData;
 		float fInt;
 		float fFrac = modff( fValue, &fInt );
 		int nInt = (int)fInt;
 		int nFrac = (int)(fabs(fFrac) * 1000.0f);
-		xil_printf("\r\n%11s : %3d.%03d%s %s", g_p7z1Analog[n*2].m_szName, nInt, nFrac, g_p7z1Analog[n*2].m_szUnit, GetADVStatus( pSensorData, g_p7z1Analog[n*2].m_nStatusOffset, g_p7z1Analog[n*2].m_nStatusShift ) );
-		if( g_p7z1Analog[n*2+1].m_szName == 0 )
+		xil_printf("\r\n%11s : %3d.%03d%s %s", g_p9z2Analog[n*2].m_szName, nInt, nFrac, g_p9z2Analog[n*2].m_szUnit, GetADVStatus( pSensorData, g_p9z2Analog[n*2].m_nStatusOffset, g_p9z2Analog[n*2].m_nStatusShift ) );
+		if( g_p9z2Analog[n*2+1].m_szName == 0 )
 		{
 			break;
 		}
-		pData = (void*)(&pSensorData[g_p7z1Analog[n*2+1].m_nOffset]);
-		fValue = g_p7z1Analog[n*2+1].m_fOffset + g_p7z1Analog[n*2+1].m_fScaleFactor * (float)*(uint16_t*)pData;
+		pData = (void*)(&pSensorData[g_p9z2Analog[n*2+1].m_nOffset]);
+		fValue = g_p9z2Analog[n*2+1].m_fOffset + g_p9z2Analog[n*2+1].m_fScaleFactor * (float)*(uint16_t*)pData;
 		fFrac = modff( fValue, &fInt );
 		nInt = (int)fInt;
 		nFrac = (int)(fabs(fFrac) * 1000.0f);
-		xil_printf("       %11s : %3d.%03d%s %s", g_p7z1Analog[n*2+1].m_szName, nInt, nFrac, g_p7z1Analog[n*2+1].m_szUnit, GetADVStatus( pSensorData, g_p7z1Analog[n*2+1].m_nStatusOffset, g_p7z1Analog[n*2+1].m_nStatusShift ) );
+		xil_printf("       %11s : %3d.%03d%s %s", g_p9z2Analog[n*2+1].m_szName, nInt, nFrac, g_p9z2Analog[n*2+1].m_szUnit, GetADVStatus( pSensorData, g_p9z2Analog[n*2+1].m_nStatusOffset, g_p9z2Analog[n*2+1].m_nStatusShift ) );
 	}
 
 	// Report alarm interrupt status
@@ -847,18 +861,18 @@ retrySensors:
 
 
 	// Report binary sensors
-	for( n = 0; g_p7z1Binary[n*2].m_szName != NULL; n++ )
+	for( n = 0; g_p9z2Binary[n*2].m_szName != NULL; n++ )
 	{
-		uint8_t nData = pSensorData[g_p7z1Binary[n*2].m_nOffset];
-		nData = 0x1 & ( nData >> g_p7z1Binary[n*2].m_nBit );
-		xil_printf("\r\n%11s : %s", g_p7z1Binary[n*2].m_szName, ( nData == 0x1 ) ? "TRUE " : "FALSE" );
-		if( g_p7z1Binary[n*2+1].m_szName == NULL )
+		uint8_t nData = pSensorData[g_p9z2Binary[n*2].m_nOffset];
+		nData = 0x1 & ( nData >> g_p9z2Binary[n*2].m_nBit );
+		xil_printf("\r\n%11s : %s", g_p9z2Binary[n*2].m_szName, ( nData == 0x1 ) ? "TRUE " : "FALSE" );
+		if( g_p9z2Binary[n*2+1].m_szName == NULL )
 		{
 			break;
 		}
-		nData = pSensorData[g_p7z1Binary[n*2+1].m_nOffset];
-		nData = 0x1 & ( nData >> g_p7z1Binary[n*2+1].m_nBit );
-		xil_printf("               %11s : %s", g_p7z1Binary[n*2+1].m_szName, ( nData == 0x1 ) ? "TRUE " : "FALSE" );
+		nData = pSensorData[g_p9z2Binary[n*2+1].m_nOffset];
+		nData = 0x1 & ( nData >> g_p9z2Binary[n*2+1].m_nBit );
+		xil_printf("               %11s : %s", g_p9z2Binary[n*2+1].m_szName, ( nData == 0x1 ) ? "TRUE " : "FALSE" );
 
 	}
 
@@ -946,7 +960,7 @@ avr_done:
 		case XFSBL_SD0_BOOT_MODE:
 		case XFSBL_SD1_BOOT_MODE:
 		case XFSBL_SD1_LS_BOOT_MODE:
-			xil_printf( "\r\nBooting from SD card ..."); break;
+			xil_printf( "\r\nBooting from EMMC/SD card ..."); break;
 		case XFSBL_EMMC_BOOT_MODE:
 			xil_printf( "\r\nBooting from MMC card ..."); break;
 		case XFSBL_USB_BOOT_MODE:

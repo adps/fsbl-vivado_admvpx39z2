@@ -2,6 +2,9 @@
 
 extern bool g_bEnableRespVobose;
 
+#include "../avrsysmon2_configs.h"
+
+#ifdef FULL_RESPS_FLASH
 RESP_FUNC( Resp_FlashApplicationRead )
 {
     static unsigned char pData[512];
@@ -57,3 +60,5 @@ RESP_FUNC( Resp_FlashApplicationWrite )
     }
     return false;
 }
+
+#endif

@@ -1,5 +1,7 @@
 #include "cmds.h"
 
+#include "../avrsysmon2_configs.h"
+#ifdef FULL_CMDS_USER_EXT
 CMD_FUNC( CmdI2CRead )
 {
     if( nCmdLength < 6 )
@@ -57,6 +59,8 @@ CMD_FUNC( CmdInvokeProtectionProtocol )
     return true;
 }
 
+#endif
+
 CMD_FUNC( CmdRequestVPDUpdate )
 {
     if( nCmdLength < 2 )
@@ -68,6 +72,7 @@ CMD_FUNC( CmdRequestVPDUpdate )
     pData[1] = pHeader[1];
     return true;
 }
+#ifdef FULL_CMDS_USER_EXT
 
 CMD_FUNC( CmdRequestMezUpdate )
 {
@@ -80,7 +85,7 @@ CMD_FUNC( CmdRequestMezUpdate )
     pData[1] = pHeader[1];
     return true;
 }
-
+#endif
 CMD_FUNC( CmdRequestSensors )
 {
     if( nCmdLength < 2 )
@@ -92,6 +97,8 @@ CMD_FUNC( CmdRequestSensors )
     pData[1] = pHeader[1];
     return true;
 }
+
+#ifdef FULL_CMDS_USER_EXT
 
 CMD_FUNC( CmdRequestBlockBox )
 {
@@ -127,6 +134,7 @@ CMD_FUNC( CmdForceMezSupply )
     pData[8] = 0;
     return true;
 }
+#endif
 
 CMD_FUNC( CmdRequestVPDData )
 {
@@ -140,6 +148,7 @@ CMD_FUNC( CmdRequestVPDData )
     return true;
 }
 
+#ifdef FULL_CMDS_USER_EXT
 CMD_FUNC( CmdRequestMezData )
 {
     if( nCmdLength < 3 )
@@ -203,8 +212,6 @@ CMD_FUNC( CmdOverrideSensor )
     return true;
 }
 
-
-
 CMD_FUNC( CmdSetFrequencyEx )
 {
 	if( nCmdLength < 8 )
@@ -236,3 +243,5 @@ CMD_FUNC( CmdGetFrequencyEx )
 	pData[3] = 0x1;
 	return true;
 }
+
+#endif

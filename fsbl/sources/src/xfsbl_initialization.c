@@ -63,7 +63,7 @@
 * @note
 *
 ******************************************************************************/
-
+//#pragma GCC optimize ("O0")
 /***************************** Include Files *********************************/
 #include "xfsbl_hw.h"
 #include "xfsbl_main.h"
@@ -278,14 +278,12 @@ u32 XFsbl_Initialize(XFsblPs * FsblInstancePtr)
 		}
 
 	/* Do ECC Initialization of DDR if required */
-	xil_printf("DDR ECC Init\r\n");
 #if 0
 	Status = XFsbl_DdrEccInit();
 	if (XFSBL_SUCCESS != Status) {
 		goto END;
 	}
 #endif
-	xil_printf("DDR ECC Init Done\r\n");
 #if defined(XFSBL_PL_CLEAR) && defined(XFSBL_BS)
 		/* In case of PS only reset and APU only reset skipping PCAP initialization*/
 		if ((FsblInstancePtr->ResetReason != XFSBL_PS_ONLY_RESET)&&

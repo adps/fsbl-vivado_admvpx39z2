@@ -1,6 +1,8 @@
 #include "cmds.h"
 
+#include "../avrsysmon2_configs.h"
 
+#ifdef FULL_CMDS_FLASH
 CMD_FUNC( CmdFlashApplicationRead )
 {
     if( nCmdLength < 5 )
@@ -34,3 +36,5 @@ CMD_FUNC( CmdFlashApplicationWrite )
     }
     return true;
 }
+
+#endif
