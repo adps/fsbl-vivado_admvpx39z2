@@ -1,6 +1,6 @@
 /******************************************************************************
 *
-* Copyright (C) 2015 - 17 Xilinx, Inc.  All rights reserved.
+* Copyright (C) 2015 - 18 Xilinx, Inc.  All rights reserved.
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -11,10 +11,6 @@
 *
 * The above copyright notice and this permission notice shall be included in
 * all copies or substantial portions of the Software.
-*
-* Use of the Software is limited solely to applications:
-* (a) running on a Xilinx device, or
-* (b) that interact with a Xilinx device through a bus or interconnect.
 *
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -53,6 +49,14 @@
 *       bv   03/20/17 Removed isolation in PS - PL AXI bus thus allowing
 *                     access to BRAM in PS only reset
 *       vns  04/04/17 Corrected IV location w.r.t Image offset.
+* 3.0   vns  01/03/18 Modified XFsbl_PartitionValidation() API, for each
+*                     partition by adding IV of LSB 8 bits with 8 bits of
+*                     IV from XFsblPs_PartitionHeader structure.
+*       vns  03/07/18 Iv copying is limited to only once from boot header,
+*                     and is used for every partition, In authentication case
+*                     we are using IV from authenticated header(copied to
+*                     internal memory), using same way for non authenticated
+*                     case as well.
 *
 * </pre>
 *
@@ -79,6 +83,7 @@
 #define XFSBL_R5_HIVEC    	(u32)(0xffff0000U)
 #define XFSBL_R5_LOVEC		(u32)(0x0U)
 #define XFSBL_SET_R5_SCTLR_VECTOR_BIT   (u32)(1<<13)
+#define XFSBL_PARTITION_IV_MASK  (0xFFU)
 
 /************************** Function Prototypes ******************************/
 static u32 XFsbl_PartitionHeaderValidation(XFsblPs * FsblInstancePtr,
@@ -93,6 +98,10 @@ static u32 XFsbl_ConfigureMemory(XFsblPs * FsblInstancePtr, u32 RunningCpu,
 static u32 XFsbl_GetLoadAddress(u32 DestinationCpu, PTRSIZE * LoadAddressPtr,
 		u32 Length);
 static void XFsbl_CheckPmuFw(const XFsblPs * FsblInstancePtr, u32 PartitionNum);
+
+#ifdef XFSBL_ENABLE_DDR_SR
+static void XFsbl_PollForDDRReady(void);
+#endif
 
 #ifdef XFSBL_SECURE
 static u32 XFsbl_CalcualteCheckSum(XFsblPs* FsblInstancePtr,
@@ -115,6 +124,7 @@ static void XFsbl_SetR5ExcepVectorLoVec(void);
 #endif
 
 #ifdef XFSBL_SECURE
+u32 Iv[XIH_BH_IV_LENGTH / 4U] = { 0 };
 u8 AuthBuffer[XFSBL_AUTH_BUFFER_SIZE]__attribute__ ((aligned (4))) = {0};
 #ifdef XFSBL_BS
 u8 HashsOfChunks[HASH_BUFFER_SIZE] __attribute__((section (".bitstream_buffer")));
@@ -145,8 +155,14 @@ u32 XFsbl_PartitionLoad(XFsblPs * FsblInstancePtr, u32 PartitionNum)
 #endif
 
 #ifdef XFSBL_WDT_PRESENT
-	/* Restart WDT as partition copy can take more time */
-	XFsbl_RestartWdt();
+	if (FsblInstancePtr->ResetReason != XFSBL_APU_ONLY_RESET) {
+		/* Restart WDT as partition copy can take more time */
+		XFsbl_RestartWdt();
+	}
+#endif
+
+#ifdef XFSBL_ENABLE_DDR_SR
+	XFsbl_PollForDDRReady();
 #endif
 
 	/**
@@ -1104,8 +1120,8 @@ static u32 XFsbl_PartitionValidation(XFsblPs * FsblInstancePtr,
 #if defined(XFSBL_SECURE)
 	s32 SStatus;
 	u32 FsblIv[XIH_BH_IV_LENGTH / 4U] = { 0 };
+	u8 *IvPtr = (u8 *)&FsblIv[2];
 	u32 UnencryptedLength = 0U;
-	u32 IvLocation;
 	u32 Length;
 	static XSecure_Aes SecureAes;
 #ifdef XFSBL_BS
@@ -1144,19 +1160,11 @@ static u32 XFsbl_PartitionValidation(XFsblPs * FsblInstancePtr,
 		IsEncryptionEnabled = TRUE;
 
 #ifdef XFSBL_SECURE
-		/* Copy the Iv from Flash into local memory */
-		IvLocation = FsblInstancePtr->ImageOffsetAddress +
-						XIH_BH_IV_OFFSET;
-
-		Status = FsblInstancePtr->DeviceOps.DeviceCopy(IvLocation,
-				(PTRSIZE) FsblIv, XIH_BH_IV_LENGTH);
-
-		if (Status != XFSBL_SUCCESS) {
-			XFsbl_Printf(DEBUG_GENERAL,
-					"XFSBL_ERROR_DECRYPTION_IV_COPY_FAIL \r\n");
-			Status = XFSBL_ERROR_DECRYPTION_IV_COPY_FAIL;
-			goto END;
-		}
+		/* Copy IV to local variable */
+		XFsbl_MemCpy(FsblIv, Iv, XIH_BH_IV_LENGTH);
+		/* Updating IV of the partition by taking from partition header */
+		*(IvPtr + 3) = (*(IvPtr + 3)) +
+				(PartitionHeader->Iv & XFSBL_PARTITION_IV_MASK);
 #else
 		XFsbl_Printf(DEBUG_GENERAL,"XFSBL_ERROR_SECURE_NOT_ENABLED \r\n");
 		Status = XFSBL_ERROR_SECURE_NOT_ENABLED;
@@ -1203,6 +1211,7 @@ static u32 XFsbl_PartitionValidation(XFsblPs * FsblInstancePtr,
 		 */
 		if (FsblInstancePtr->ResetReason == XFSBL_PS_ONLY_RESET)
 		{
+			Status = XFSBL_SUCCESS;
 			XFsbl_Printf(DEBUG_INFO,
 			"PS Only Reset. Skipping PL configuration\r\n");
 			goto END;
@@ -1687,7 +1696,6 @@ static void XFsbl_CheckPmuFw(const XFsblPs* FsblInstancePtr, u32 PartitionNum)
 					break;
 				}
 		} while(1);
-
 	}
 
 }
@@ -1865,6 +1873,76 @@ static u32 XFsbl_CalcualteSHA(const XFsblPs * FsblInstancePtr, PTRSIZE LoadAddre
 	return Status;
 }
 #endif  /* end of XFSBL_SECURE */
+
+#ifdef XFSBL_ENABLE_DDR_SR
+/*****************************************************************************/
+/**
+ * This function waits for DDR out of self refresh.
+ *
+ * @param	None
+ *
+ * @return	None
+ *
+ *****************************************************************************/
+static void XFsbl_PollForDDRSrExit(void)
+{
+	u32 RegValue;
+	/* Timeout count for arround 1 second */
+	u32 TimeOut = XPAR_PSU_CORTEXA53_0_CPU_CLK_FREQ_HZ;
+
+	/* Wait for DDR exit from self refresh mode within 1 second */
+	while (TimeOut > 0) {
+		RegValue = Xil_In32(XFSBL_DDR_STATUS_REGISTER_OFFSET);
+		if (!(RegValue & DDR_STATUS_FLAG_MASK)) {
+			break;
+		}
+		TimeOut--;
+	}
+}
+
+/*****************************************************************************/
+/**
+ * This function removes reserved mark of DDR once it is out of self refresh.
+ *
+ * @param	None
+ *
+ * @return	None
+ *
+ *****************************************************************************/
+static void XFsbl_PollForDDRReady(void)
+{
+	volatile u32 RegValue;
+
+	RegValue = XFsbl_In32(PMU_GLOBAL_GLOBAL_CNTRL);
+	if ((RegValue & PMU_GLOBAL_GLOBAL_CNTRL_FW_IS_PRESENT_MASK)
+	    == PMU_GLOBAL_GLOBAL_CNTRL_FW_IS_PRESENT_MASK) {
+		/*
+		 * PMU firmware is ready. Set flag to indicate that DDR
+		 * controller is ready, so that the PMU may bring the DDR out
+		 * of self refresh if necessary.
+		 */
+		RegValue = Xil_In32(XFSBL_DDR_STATUS_REGISTER_OFFSET);
+		Xil_Out32(XFSBL_DDR_STATUS_REGISTER_OFFSET, RegValue |
+				DDRC_INIT_FLAG_MASK);
+
+		/*
+		 * Read PMU register bit value that indicates DDR is in self
+		 * refresh mode.
+		 */
+		RegValue = Xil_In32(XFSBL_DDR_STATUS_REGISTER_OFFSET) &
+			DDR_STATUS_FLAG_MASK;
+		if (RegValue) {
+			/* Wait untill DDR exit from self refresh */
+			XFsbl_PollForDDRSrExit();
+			/*
+			 * Mark DDR region as "Memory" as DDR initialization is
+			 * done
+			 */
+			XFsbl_MarkDdrAsReserved(FALSE);
+		}
+	}
+}
+#endif
 
 #ifdef ARMR5
 

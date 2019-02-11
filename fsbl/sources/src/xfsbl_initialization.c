@@ -1,6 +1,6 @@
 /******************************************************************************
 *
-* Copyright (C) 2015 - 17 Xilinx, Inc.  All rights reserved.
+* Copyright (C) 2015 - 18 Xilinx, Inc.  All rights reserved.
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -11,10 +11,6 @@
 *
 * The above copyright notice and this permission notice shall be included in
 * all copies or substantial portions of the Software.
-*
-* Use of the Software is limited solely to applications:
-* (a) running on a Xilinx device, or
-* (b) that interact with a Xilinx device through a bus or interconnect.
 *
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -58,12 +54,16 @@
 *                     is done.
 *       vns  04/04/17 Corrected image header size.
 *       ma   05/10/17 Enable PROG to PL when reset reason is ps-only reset
+* 4.0   vns  03/07/18 Added boot header authentication, attributes reading
+*                     from boot header local buffer, copying IV to global
+*                     variable for using during decryption of partition.
+* 5.0   mn   07/06/18 Add DDR initialization support for new DDR DIMM part
 * </pre>
 *
 * @note
 *
 ******************************************************************************/
-//#pragma GCC optimize ("O0")
+
 /***************************** Include Files *********************************/
 #include "xfsbl_hw.h"
 #include "xfsbl_main.h"
@@ -77,6 +77,7 @@
 #include "xfsbl_bs.h"
 #include "xfsbl_usb.h"
 #include "xfsbl_authentication.h"
+#include "xfsbl_ddr_init.h"
 
 /************************** Constant Definitions *****************************/
 #define PART_NAME_LEN_MAX		20U
@@ -120,15 +121,17 @@ extern  u8 __data_start;
 extern  u8 __data_end;
 extern  u8 __dup_data_start;
 
-#ifdef XFSBL_SECURE
 #ifndef XFSBL_BS
 u8 ReadBuffer[XFSBL_SIZE_IMAGE_HDR]
 		__attribute__((section (".bitstream_buffer")));
 #else
 extern u8 ReadBuffer[READ_BUFFER_SIZE];
 #endif
+
+#ifdef XFSBL_SECURE
 u8 *ImageHdr = ReadBuffer;
 extern u8 AuthBuffer[XFSBL_AUTH_BUFFER_SIZE];
+extern u32 Iv[XIH_BH_IV_LENGTH / 4U];
 #endif
 
 /****************************************************************************/
@@ -229,6 +232,9 @@ static u32 XFsbl_GetResetReason (void)
 u32 XFsbl_Initialize(XFsblPs * FsblInstancePtr)
 {
 	u32 Status;
+#ifdef XFSBL_ENABLE_DDR_SR
+	u32 RegValue;
+#endif
 
 	FsblInstancePtr->ResetReason = XFsbl_GetResetReason();
 
@@ -277,13 +283,31 @@ u32 XFsbl_Initialize(XFsblPs * FsblInstancePtr)
 			goto END;
 		}
 
+#ifdef XFSBL_ENABLE_DDR_SR
+		/*
+		 * Read PMU register bit value that indicates DDR is in self
+		 * refresh mode.
+		 */
+		RegValue = Xil_In32(XFSBL_DDR_STATUS_REGISTER_OFFSET) &
+			   DDR_STATUS_FLAG_MASK;
+		if (!RegValue) {
+			/*
+			 * Skip ECC initialization if DDR is in self refresh
+			 * mode.
+			 */
+			Status = XFsbl_DdrEccInit();
+			if (XFSBL_SUCCESS != Status) {
+				goto END;
+			}
+		}
+#else
 	/* Do ECC Initialization of DDR if required */
-#if 0
 	Status = XFsbl_DdrEccInit();
 	if (XFSBL_SUCCESS != Status) {
 		goto END;
 	}
 #endif
+
 #if defined(XFSBL_PL_CLEAR) && defined(XFSBL_BS)
 		/* In case of PS only reset and APU only reset skipping PCAP initialization*/
 		if ((FsblInstancePtr->ResetReason != XFSBL_PS_ONLY_RESET)&&
@@ -579,6 +603,10 @@ static u32 XFsbl_ResetValidation(void)
 		if(((ErrStatusRegValue& PMU_GLOBAL_ERROR_STATUS_1_LPD_SWDT_MASK)
 			== PMU_GLOBAL_ERROR_STATUS_1_LPD_SWDT_MASK) &&
 			(FsblErrorStatus == XFSBL_RUNNING)) {
+#ifdef XFSBL_WDT_PRESENT
+			/* Clear the SWDT0/1 reset error */
+			XFsbl_Out32(PMU_GLOBAL_ERROR_STATUS_1, XFSBL_WDT_MASK);
+#endif
 		/**
 		 * reset is due to System WDT.
 		 * Do a fallback
@@ -621,8 +649,8 @@ END:
 static u32 XFsbl_SystemInit(XFsblPs * FsblInstancePtr)
 {
 	u32 Status;
-#if defined (XPAR_PSU_DDR_0_S_AXI_BASEADDR) && !defined (ARMR5)
-	u32 BlockNum;
+#ifdef XFSBL_ENABLE_DDR_SR
+	u32 RegValue;
 #endif
 
 	if (FsblInstancePtr->ResetReason != XFSBL_PS_ONLY_RESET) {
@@ -679,39 +707,43 @@ static u32 XFsbl_SystemInit(XFsblPs * FsblInstancePtr)
 		goto END;
 	}
 
+#if defined(XPS_BOARD_ZCU102) || defined(XPS_BOARD_ZCU106)
+	/*
+	 * This function is used only for ZCU102 and ZCU106 boards. The DDR part
+	 * (MTA8ATF51264HZ) on these boards have changed to a newer DDR part
+	 * (MTA4ATF51264HZ) which has different configuration used than the
+	 * earlier one.
+	 * This function will reinitialize the DDR if it detects the DDR used is
+	 * newer part (MTA4ATF51264HZ).
+	 */
+	Status = XFsbl_DdrInit();
+	if (XFSBL_SUCCESS != Status) {
+		XFsbl_Printf(DEBUG_GENERAL,"XFSBL_DDR_INIT_FAILED\n\r");
+		goto END;
+	}
+#endif
+
 #ifdef XFSBL_PERF
 	XTime_GetTime(&(FsblInstancePtr->PerfTime.tFsblStart));
 #endif
 
-#if defined (XPAR_PSU_DDR_0_S_AXI_BASEADDR) && !defined (ARMR5)
-	/* For A53, mark DDR region as "Memory" as DDR initialization is done */
-
-#ifdef ARMA53_64
-	/* For A53 64bit*/
-	for(BlockNum = 0; BlockNum < NUM_BLOCKS_A53_64; BlockNum++)
-	{
-		XFsbl_SetTlbAttributes(BlockNum * BLOCK_SIZE_A53_64, ATTRIB_MEMORY_A53_64);
+#ifdef XFSBL_ENABLE_DDR_SR
+	/*
+	 * Read PMU register bit value that indicates DDR is in self refresh
+	 * mode.
+	 */
+	RegValue = Xil_In32(XFSBL_DDR_STATUS_REGISTER_OFFSET) &
+		DDR_STATUS_FLAG_MASK;
+	/* If DDR is in self refresh mode, mark DDR as reserved for now */
+	if (!RegValue) {
+		XFsbl_MarkDdrAsReserved(FALSE);
+	} else {
+		XFsbl_MarkDdrAsReserved(TRUE);
 	}
-
-#ifdef XFSBL_PS_HI_DDR_START_ADDRESS
-	for(BlockNum = 0; BlockNum < NUM_BLOCKS_A53_64_HIGH; BlockNum++)
-	{
-		XFsbl_SetTlbAttributes(
-			XFSBL_PS_HI_DDR_START_ADDRESS + BlockNum * BLOCK_SIZE_A53_64_HIGH,
-			ATTRIB_MEMORY_A53_64);
-	}
-#endif
-	Xil_DCacheFlush();
 #else
-	/* For A53 32bit*/
-	for(BlockNum = 0U; BlockNum < NUM_BLOCKS_A53_32; BlockNum++)
-	{
-		XFsbl_SetTlbAttributes(BlockNum * BLOCK_SIZE_A53_32, ATTRIB_MEMORY_A53_32);
-	}
-	Xil_DCacheFlush();
+	/* Mark DDR region as "Memory" as DDR initialization is done */
+	XFsbl_MarkDdrAsReserved(FALSE);
 #endif
-#endif
-
 
 	/**
 	 * Forcing the SD card detection signal to bypass the debouncing logic.
@@ -753,14 +785,8 @@ static u32 XFsbl_PrimaryBootDeviceInit(XFsblPs * FsblInstancePtr)
 	/**
 	 * Read Boot Mode register and update the value
 	 */
-	//Allow software override of the 9z2 boot mode to avoid having to
-	//solder the boot mode select resistor
-#ifdef XFSBL_OVERRIDE_BOOT_MODE
-	BootMode = XFSBL_OVERRIDE_BOOT_MODE;
-#else
 	BootMode = XFsbl_In32(CRL_APB_BOOT_MODE_USER) &
 			CRL_APB_BOOT_MODE_USER_BOOT_MODE_MASK;
-#endif
 
 	FsblInstancePtr->PrimaryBootDevice = BootMode;
 
@@ -780,10 +806,16 @@ static u32 XFsbl_PrimaryBootDeviceInit(XFsblPs * FsblInstancePtr)
 		 * Initialize the WDT and CSU drivers
 		 */
 #ifdef XFSBL_WDT_PRESENT
-		Status = XFsbl_InitWdt();
-		if (XFSBL_SUCCESS != Status) {
-			XFsbl_Printf(DEBUG_GENERAL,"WDT initialization failed \n\r");
-			goto END;
+		/*
+		 * Skip watching over APU using WDT during APU only restart
+		 * as PMU will watchover APU
+		 */
+		if (FsblInstance.ResetReason != XFSBL_APU_ONLY_RESET) {
+			Status = XFsbl_InitWdt();
+			if (XFSBL_SUCCESS != Status) {
+				XFsbl_Printf(DEBUG_GENERAL,"WDT initialization failed \n\r");
+				goto END;
+			}
 		}
 #endif
 
@@ -793,6 +825,16 @@ static u32 XFsbl_PrimaryBootDeviceInit(XFsblPs * FsblInstancePtr)
 			goto END;
 		}
 	}
+
+/**
+ * If FSBL_PARTITION_LOAD_EXCLUDE macro is defined,then the partition loading
+ * will be skipped and irrespective of the actual boot device,FSBL will run the way
+ * it runs in JTAG boot mode
+ */
+#ifdef FSBL_PARTITION_LOAD_EXCLUDE
+	FsblInstancePtr->PrimaryBootDevice = XFSBL_JTAG_BOOT_MODE;
+	Status = XFSBL_STATUS_JTAG;
+#else
 
 	switch(BootMode)
 	{
@@ -960,7 +1002,7 @@ static u32 XFsbl_PrimaryBootDeviceInit(XFsblPs * FsblInstancePtr)
 		} break;
 
 	}
-
+#endif
 	/**
 	 * In case of error or Jtag boot, goto end
 	 */
@@ -1067,29 +1109,31 @@ static u32 XFsbl_ValidateHeader(XFsblPs * FsblInstancePtr)
 
 	FlashImageOffsetAddress = FsblInstancePtr->ImageOffsetAddress;
 
+	/* Copy boot header to internal memory */
+	Status = FsblInstancePtr->DeviceOps.DeviceCopy(FlashImageOffsetAddress,
+	                   (PTRSIZE )ReadBuffer, XIH_BH_MAX_SIZE);
+	if (XFSBL_SUCCESS != Status) {
+			XFsbl_Printf(DEBUG_GENERAL,"Device Copy Failed \n\r");
+			goto END;
+	}
+#ifdef XFSBL_SECURE
+	/* copy IV to local variable */
+	XFsbl_MemCpy(Iv, ReadBuffer + XIH_BH_IV_OFFSET, XIH_BH_IV_LENGTH);
+#endif
 	/**
 	 * Read Boot Image attributes
 	 */
-	Status = FsblInstancePtr->DeviceOps.DeviceCopy(FlashImageOffsetAddress
-                    + XIH_BH_IMAGE_ATTRB_OFFSET,
-                   (PTRSIZE ) &BootHdrAttrb, XIH_FIELD_LEN);
-        if (XFSBL_SUCCESS != Status) {
-                XFsbl_Printf(DEBUG_GENERAL,"Device Copy Failed \n\r");
-                goto END;
-        }
+	BootHdrAttrb = Xil_In32((UINTPTR)ReadBuffer +
+					XIH_BH_IMAGE_ATTRB_OFFSET);
 	FsblInstancePtr->BootHdrAttributes = BootHdrAttrb;
 
 	/**
 	 * Read the Image Header Table offset from
 	 * Boot Header
 	 */
-	Status = FsblInstancePtr->DeviceOps.DeviceCopy(FlashImageOffsetAddress
-				+ XIH_BH_IH_TABLE_OFFSET,
-		   (PTRSIZE ) &ImageHeaderTableAddressOffset, XIH_FIELD_LEN);
-	if (XFSBL_SUCCESS != Status) {
-		XFsbl_Printf(DEBUG_GENERAL,"Device Copy Failed \n\r");
-		goto END;
-	}
+	ImageHeaderTableAddressOffset = Xil_In32((UINTPTR)ReadBuffer +
+					XIH_BH_IH_TABLE_OFFSET);
+
 	XFsbl_Printf(DEBUG_INFO,"Image Header Table Offset 0x%0lx \n\r",
 			ImageHeaderTableAddressOffset);
 
@@ -1097,15 +1141,23 @@ static u32 XFsbl_ValidateHeader(XFsblPs * FsblInstancePtr)
 	 * Read Efuse bit and check Boot Header for Authentication
 	 */
 	EfuseCtrl = XFsbl_In32(EFUSE_SEC_CTRL);
+
+	if (((EfuseCtrl & EFUSE_SEC_CTRL_RSA_EN_MASK) != 0x00)
+		&& ((BootHdrAttrb & XIH_BH_IMAGE_ATTRB_RSA_MASK) ==
+					XIH_BH_IMAGE_ATTRB_RSA_MASK)) {
+		Status = XFSBL_ERROR_BH_AUTH_IS_NOTALLOWED;
+		XFsbl_Printf(DEBUG_GENERAL,"XFSBL_ERROR_BH_AUTH_IS_NOTALLOWED"
+					" when eFSUE RSA bit is set \n\r");
+		goto END;
+	}
+
+	/* If authentication is enabled */
 	if (((EfuseCtrl & EFUSE_SEC_CTRL_RSA_EN_MASK) != 0U) ||
 	    ((BootHdrAttrb & XIH_BH_IMAGE_ATTRB_RSA_MASK)
 		== XIH_BH_IMAGE_ATTRB_RSA_MASK)) {
 
 		XFsbl_Printf(DEBUG_INFO,"Authentication Enabled\r\n");
 #ifdef XFSBL_SECURE
-		/**
-		 * Authenticate the image header
-		 */
 		 /* Read AC offset from Image header table */
 		Status = FsblInstancePtr->DeviceOps.DeviceCopy(FlashImageOffsetAddress
 		            + ImageHeaderTableAddressOffset + XIH_IHT_AC_OFFSET,
@@ -1123,6 +1175,26 @@ static u32 XFsbl_ValidateHeader(XFsblPs * FsblInstancePtr)
 			if (XFSBL_SUCCESS != Status) {
 				goto END;
 			}
+
+			/* Authenticate boot header */
+			/* When eFUSE RSA enable bit is blown */
+			if ((EfuseCtrl & EFUSE_SEC_CTRL_RSA_EN_MASK) != 0U) {
+				Status = XFsbl_BhAuthentication(FsblInstancePtr,
+						ReadBuffer, (PTRSIZE)AuthBuffer, TRUE);
+			}
+			/* When eFUSE RSA bit is not blown */
+			else {
+				Status = XFsbl_BhAuthentication(FsblInstancePtr,
+						ReadBuffer, (PTRSIZE)AuthBuffer, FALSE);
+			}
+			if (Status != XST_SUCCESS) {
+			    XFsbl_Printf(DEBUG_GENERAL,
+					"Failure at boot header authentication\r\n");
+				goto END;
+			}
+
+
+			/* Authenticate Image header table */
 			/*
 			 * Total size of Image header may vary
 			 * depending on padding so
@@ -1146,8 +1218,23 @@ static u32 XFsbl_ValidateHeader(XFsblPs * FsblInstancePtr)
 					Size + XFSBL_AUTH_CERT_MIN_SIZE,
 					(PTRSIZE)(AuthBuffer), 0x00U);
 			if (Status != XFSBL_SUCCESS) {
+				XFsbl_Printf(DEBUG_GENERAL,
+					"Failure at image header"
+					" table authentication\r\n");
 				goto END;
 
+			}
+			/*
+			 * As authentication is success
+			 * verify ACoffset used for authentication
+			 */
+			if (AcOffset !=
+			 Xil_In32((UINTPTR)ImageHdr + XIH_IHT_AC_OFFSET)) {
+				Status = XFSBL_ERROR_IMAGE_HEADER_ACOFFSET;
+				XFsbl_Printf(DEBUG_GENERAL,
+					"Wrong Authentication "
+					"certificate offset\r\n");
+				goto END;
 			}
 		}
 		else {
@@ -1162,7 +1249,7 @@ static u32 XFsbl_ValidateHeader(XFsblPs * FsblInstancePtr)
 		 * from OCM which we already copied.
 		 */
 		Status = XFsbl_ReadImageHeader(&FsblInstancePtr->ImageHeader,
-				NULL, FlashImageOffsetAddress,
+				NULL, (UINTPTR)ImageHdr,
 				FsblInstancePtr->ProcessorID,
 				ImageHeaderTableAddressOffset);
 		if (XFSBL_SUCCESS != Status) {
@@ -1794,4 +1881,52 @@ static void XFsbl_ClearPendingInterrupts(void)
 	XFsbl_Out32 (ACPU_GIC_GICD_CPENDSGIR2, InterruptClearVal);
 	XFsbl_Out32 (ACPU_GIC_GICD_CPENDSGIR3, InterruptClearVal);
 
+}
+
+/*****************************************************************************/
+/**
+ * This function marks DDR region as "Reserved" or mark as "Memory".
+ *
+ * @param Cond is the condition to mark DDR region as Reserved or Memory. If
+ *	  this parameter is TRUE it marks DDR region as Reserved and if it is
+ *	  FALSE it marks DDR as Memory.
+ *
+ * @return
+ *
+ *
+ *****************************************************************************/
+void XFsbl_MarkDdrAsReserved(u8 Cond)
+{
+#if defined (XPAR_PSU_DDR_0_S_AXI_BASEADDR) && !defined (ARMR5)
+	u32 Attrib = ATTRIB_MEMORY_A53_64;
+	u64 BlockNum;
+
+	if (TRUE == Cond) {
+		Attrib = ATTRIB_RESERVED_A53;
+	}
+
+#ifdef ARMA53_64
+	/* For A53 64bit*/
+	for (BlockNum = 0; BlockNum < NUM_BLOCKS_A53_64; BlockNum++) {
+		XFsbl_SetTlbAttributes(BlockNum * BLOCK_SIZE_A53_64, Attrib);
+	}
+#ifdef XFSBL_PS_HI_DDR_START_ADDRESS
+	for (BlockNum = 0; BlockNum < NUM_BLOCKS_A53_64_HIGH; BlockNum++) {
+		XFsbl_SetTlbAttributes(XFSBL_PS_HI_DDR_START_ADDRESS +
+				       BlockNum * BLOCK_SIZE_A53_64_HIGH,
+				       Attrib);
+	}
+#endif
+	Xil_DCacheFlush();
+#else
+	if (FALSE == Cond) {
+		Attrib = ATTRIB_MEMORY_A53_32;
+	}
+	/* For A53 32bit*/
+	for (BlockNum = 0U; BlockNum < NUM_BLOCKS_A53_32; BlockNum++) {
+		XFsbl_SetTlbAttributes(BlockNum * BLOCK_SIZE_A53_32, Attrib);
+	}
+	Xil_DCacheFlush();
+#endif
+#endif
 }

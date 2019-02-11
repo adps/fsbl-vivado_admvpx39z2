@@ -1,6 +1,6 @@
 /******************************************************************************
 *
-* Copyright (C) 2015 -17 Xilinx, Inc.  All rights reserved.
+* Copyright (C) 2015 -18 Xilinx, Inc.  All rights reserved.
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -11,10 +11,6 @@
 *
 * The above copyright notice and this permission notice shall be included in
 * all copies or substantial portions of the Software.
-*
-* Use of the Software is limited solely to applications:
-* (a) running on a Xilinx device, or
-* (b) that interact with a Xilinx device through a bus or interconnect.
 *
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -97,11 +93,6 @@ u32 XFsbl_HookBeforeHandoff(u32 EarlyHandoff)
 	/**
 	 * Add the code here
 	 */
-	//Code from AR# 69533
-	XFsbl_Out32 (0XFE20C200, 0x02417);     /* USB3_0_XHCI_GUSB2PHYCFG_OFFSET= 0XFE20C200*/
-	XFsbl_Out32 (0xFF9D007C, 0x1); /*disable usb3.0 pipe3 clock and enable usb2.0 clock */
-	XFsbl_Out32 (0xFF9D0080, 0x1);  /*Pipe power present*/
-	XFsbl_Out32 (0xff5e00a8, 0x01000602); /*LPD switch to active the clock*/
 
 	return Status;
 }
@@ -144,10 +135,24 @@ u32 XFsbl_HookBeforeFallback(void)
 u32 XFsbl_HookPsuInit(void)
 {
 	u32 Status;
+#ifdef XFSBL_ENABLE_DDR_SR
+	u32 RegVal;
+#endif
 
 	/* Add the code here */
 
+#ifdef XFSBL_ENABLE_DDR_SR
+	/* Check if DDR is in self refresh mode */
+	RegVal = Xil_In32(XFSBL_DDR_STATUS_REGISTER_OFFSET) &
+		DDR_STATUS_FLAG_MASK;
+	if (RegVal) {
+		Status = (u32)psu_init_ddr_self_refresh();
+	} else {
+		Status = (u32)psu_init();
+	}
+#else
 	Status = (u32)psu_init();
+#endif
 
 	if (XFSBL_SUCCESS != Status) {
 			XFsbl_Printf(DEBUG_GENERAL,"XFSBL_PSU_INIT_FAILED\n\r");
@@ -170,3 +175,39 @@ u32 XFsbl_HookPsuInit(void)
 
 	return Status;
 }
+
+/*****************************************************************************/
+/**
+ * This function detects type of boot based on information from
+ * PMU_GLOBAL_GLOB_GEN_STORAGE1. If Power Off Suspend is supported FSBL must
+ * wait for PMU to detect boot type and provide that information using register.
+ * In case of resume from Power Off Suspend PMU will wait for FSBL to confirm
+ * detection by writting 1 to PMU_GLOBAL_GLOB_GEN_STORAGE2.
+ *
+ * @return Boot type, 0 in case of cold boot, 1 for warm boot
+ *
+ * @note none
+ *****************************************************************************/
+#ifdef ENABLE_POS
+u32 XFsbl_HookGetPosBootType(void)
+{
+	u32 WarmBoot = 0;
+	u32 RegValue = 0;
+
+	do {
+		RegValue = XFsbl_In32(PMU_GLOBAL_GLOB_GEN_STORAGE1);
+	} while (0U == RegValue);
+
+	/* Clear Gen Storage register so it can be used later in system */
+	XFsbl_Out32(PMU_GLOBAL_GLOB_GEN_STORAGE1, 0U);
+
+	WarmBoot = RegValue - 1;
+
+	/* Confirm detection in case of resume from Power Off Suspend */
+	if (0 != RegValue) {
+		XFsbl_Out32(PMU_GLOBAL_GLOB_GEN_STORAGE2, 1U);
+	}
+
+	return WarmBoot;
+}
+#endif

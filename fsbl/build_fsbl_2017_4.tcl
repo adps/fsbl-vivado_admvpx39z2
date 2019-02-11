@@ -14,7 +14,7 @@ sdk setws $workspace_dir
 cd $workspace_dir
 
 #Genreate hw, bsp and application projects
-sdk createhw -name $hw_proj -hwspec $fsbl_sources_dir/hdf/admvpx39z2_emmc_sata_usb_dp.hdf
+sdk createhw -name $hw_proj -hwspec $fsbl_sources_dir/hdf/admvpx39z2_simple_sdcard_DP_usb_2017.4.hdf
 sdk createbsp -name $bsp_proj -hwproject $hw_proj -proc psu_cortexa53_0 -os standalone -arch 64
 setlib -bsp $bsp_proj -lib xilffs
 setlib -bsp $bsp_proj -lib xilsecure
@@ -42,7 +42,7 @@ cd ../build_bootimg
 
 set OS [lindex $tcl_platform(os) 0]
 if { $OS == "Windows" } {
-  exec mkimg-uboot_bitstream.bat
+  exec mkimg-20174.bat
 } else {
-  exec ./mkimg-uboot_bitstream.sh
+  exec ./mkimg-20174.sh
 }

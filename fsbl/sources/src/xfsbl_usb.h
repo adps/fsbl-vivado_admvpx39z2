@@ -12,10 +12,6 @@
 * The above copyright notice and this permission notice shall be included in
 * all copies or substantial portions of the Software.
 *
-* Use of the Software is limited solely to applications:
-* (a) running on a Xilinx device, or
-* (b) that interact with a Xilinx device through a bus or interconnect.
-*
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
@@ -109,11 +105,13 @@ extern "C" {
 /* @} */
 
 #define DFU_STATUS_SIZE				6U
+#define XFSBL_USB_ENDPOINT_NUMBER_MASK	0xFU
+#define XFSBL_USB_ENDPOINT_DIR_MASK		0x80U
 /************************** Function Prototypes **************************/
 void XFsbl_DfuInit(void);
 void XFsbl_DfuSetIntf(SetupPacket *SetupData);
 void XFsbl_DfuClassReq(SetupPacket *SetupData);
-void XFsbl_DfuReset(struct XUsbPsu* InstancePtr);
+void XFsbl_DfuReset(struct Usb_DevData* InstancePtr);
 u32 XFsbl_Ch9SetupDevDescReply(u8 *BufPtr, u32 BufferLen);
 u32 XFsbl_Ch9SetupCfgDescReply(u8 *BufPtr, u32 BufferLen);
 u32 XFsbl_Ch9SetupStrDescReply(u8 *BufPtr, u32 BufferLen, u8 Index);

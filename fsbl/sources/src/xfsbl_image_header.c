@@ -1,6 +1,6 @@
 /******************************************************************************
 *
-* Copyright (C) 2015 - 17 Xilinx, Inc.  All rights reserved.
+* Copyright (C) 2015 - 18 Xilinx, Inc.  All rights reserved.
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -11,10 +11,6 @@
 *
 * The above copyright notice and this permission notice shall be included in
 * all copies or substantial portions of the Software.
-*
-* Use of the Software is limited solely to applications:
-* (a) running on a Xilinx device, or
-* (b) that interact with a Xilinx device through a bus or interconnect.
 *
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -51,6 +47,8 @@
 *       vns  02/17/17 If authentication is enabled whole image header
 *                     is been validated by copying to OCM.
 *                     Updated destination CPU for PMUFW.
+* 3.0   vns  03/07/18 All the partitions should be encrypted when ENC_ONLY
+*                     eFUSE bit is set, if not encrypted FSBL throw an error.
 * </pre>
 *
 * @note
@@ -253,7 +251,7 @@ static u32 XFsbl_ValidateImageHeaderTable(
 		 */
 
 		PartitionPresentDevice = ImageHeaderTable->PartitionPresentDevice;
-		if ((PartitionPresentDevice < XIH_IHT_PPD_SAME) &&
+		if ((PartitionPresentDevice < XIH_IHT_PPD_SAME) ||
 		(PartitionPresentDevice > XIH_IHT_PPD_SATA) )
 		{
 			Status = XFSBL_ERROR_PPD;
@@ -606,7 +604,9 @@ u32 XFsbl_ValidatePartitionHeader(
 	u32 DestinationCpu;
 	u32 DestinationDevice;
 	u32 IsEncrypted, IsAuthenticated;
-
+#if defined(XFSBL_SECURE) && defined(XFSBL_FORCE_ENC)
+	u32 EncOnly;
+#endif
 
 	/**
 	 * Update the variables
@@ -631,6 +631,18 @@ u32 XFsbl_ValidatePartitionHeader(
 		IsAuthenticated = FALSE;
 	}
 
+#if defined(XFSBL_SECURE) && defined(XFSBL_FORCE_ENC)
+	/* Check if encryption is mandatory */
+	EncOnly = XFsbl_In32(EFUSE_SEC_CTRL) & EFUSE_SEC_CTRL_ENC_ONLY_MASK;
+	if ((EncOnly != 0x00) && (IsEncrypted == FALSE)) {
+		Status = XFSBL_ERROR_ENC_IS_MANDATORY;
+		XFsbl_Printf(DEBUG_GENERAL,
+				"XFSBL_ERROR_ENC_IS_MANDATORY as "
+				"eFUSE ENC_ONLY bit is set\r\n");
+		Status = XFSBL_FAILURE;
+		goto END;
+	}
+#endif
 
 	DestinationCpu = XFsbl_GetDestinationCpu(PartitionHeader);
 		if(ResetType == XFSBL_APU_ONLY_RESET){

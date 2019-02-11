@@ -1,0 +1,9 @@
+//arch = zynqmp; split = false; format = BIN
+the_ROM_image:
+{
+	[pmufw_image]../9z2_20183_workspace/9z2_pmufw/Debug/9z2_pmufw.elf
+	[destination_cpu = a53-0, bootloader]../9z2_20183_workspace/9z2_fsbl/Debug/9z2_fsbl.elf
+	[destination_cpu = a53-0, exception_level = el-3, trustzone]./bl31_20174.elf
+	[destination_cpu = a53-0, exception_level = el-2]./u-boot_20174.elf
+	[destination_device = pl]../../fpga/vivado/simple-9z2/simple-9z2.runs/impl_1/simple_9z2_wrapper.bit
+}

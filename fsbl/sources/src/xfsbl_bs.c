@@ -12,10 +12,6 @@
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
  *
- * Use of the Software is limited solely to applications:
- * (a) running on a Xilinx device, or
- * (b) that interact with a Xilinx device through a bus or interconnect.
- *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
@@ -350,3 +346,41 @@ END:
 #endif
 
 #endif
+/*****************************************************************************/
+/**
+ * This function checks for PL Done bit to be set and if set, resets
+ * PCAP after this.
+ *
+ * @param	None
+ *
+ * @return	error status based on implemented functionality (SUCCESS by default)
+ *
+ *****************************************************************************/
+u32 XFsbl_PLCheckForDone(void) {
+	u32 Status;
+	u32 RegVal = 0U;
+
+	/* Read PCAP Status register and check for PL_DONE bit */
+	RegVal = XFsbl_In32(CSU_PCAP_STATUS);
+	RegVal &= CSU_PCAP_STATUS_PL_DONE_MASK;
+	if (RegVal != CSU_PCAP_STATUS_PL_DONE_MASK) {
+		Status = XFSBL_BITSTREAM_NOT_LOADED;
+		goto END;
+	}
+
+	XFsbl_Printf(DEBUG_GENERAL, "PL Configuration done successfully \r\n");
+
+	/* Reset PCAP after data transfer */
+	RegVal = XFsbl_In32(CSU_PCAP_RESET);
+	RegVal = RegVal | CSU_PCAP_RESET_RESET_MASK;
+	XFsbl_Out32(CSU_PCAP_RESET, RegVal);
+
+	do {
+		RegVal = XFsbl_In32(CSU_PCAP_RESET);
+		RegVal = RegVal & CSU_PCAP_RESET_RESET_MASK;
+	} while (RegVal != CSU_PCAP_RESET_RESET_MASK);
+
+	Status = XFSBL_SUCCESS;
+	END:
+	return Status;
+}

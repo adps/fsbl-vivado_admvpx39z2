@@ -12,10 +12,6 @@
 * The above copyright notice and this permission notice shall be included in
 * all copies or substantial portions of the Software.
 *
-* Use of the Software is limited solely to applications:
-* (a) running on a Xilinx device, or
-* (b) that interact with a Xilinx device through a bus or interconnect.
-*
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
@@ -114,9 +110,6 @@ extern "C" {
 #define FSBL_DEBUG_DETAILED
 #endif
 
-//#define XFSBL_OVERRIDE_BOOT_MODE XFSBL_SD0_BOOT_MODE
-
-
 /**
  * @name FSBL code include options
  *
@@ -157,6 +150,7 @@ extern "C" {
 	#define FSBL_PROT_BYPASS_EXCLUDE_VAL	(1U)
 	#define FSBL_PARTITION_LOAD_EXCLUDE_VAL (1U)
 	#define FSBL_FORCE_ENC_EXCLUDE_VAL		(1U)
+	#define FSBL_DDR_SR_EXCLUDE_VAL			(1U)
 #endif
 #ifdef SD_PL_FSBL
 	#define FSBL_NAND_EXCLUDE_VAL			(1U)
@@ -172,10 +166,10 @@ extern "C" {
 	#define FSBL_PL_CLEAR_EXCLUDE_VAL		(1U)
 	#define FSBL_USB_EXCLUDE_VAL			(1U)
 	#define FSBL_PROT_BYPASS_EXCLUDE_VAL	(1U)
-	#define FSBL_PARTITION_LOAD_EXCLUDE_VAL (1U)
+	#define FSBL_PARTITION_LOAD_EXCLUDE_VAL (0U)
 	#define FSBL_FORCE_ENC_EXCLUDE_VAL		(1U)
+	#define FSBL_DDR_SR_EXCLUDE_VAL			(1U)
 #endif
-
 #if !defined(SD_PL_FSBL) && !defined(MINIMAL_FSBL)
 	#define FSBL_NAND_EXCLUDE_VAL			(0U)
 	#define FSBL_QSPI_EXCLUDE_VAL			(0U)
@@ -192,7 +186,9 @@ extern "C" {
 	#define FSBL_PROT_BYPASS_EXCLUDE_VAL	(1U)
 	#define FSBL_PARTITION_LOAD_EXCLUDE_VAL (0U)
 	#define FSBL_FORCE_ENC_EXCLUDE_VAL		(0U)
+	#define FSBL_DDR_SR_EXCLUDE_VAL			(1U)
 #endif
+
 
 #if FSBL_NAND_EXCLUDE_VAL
 #define FSBL_NAND_EXCLUDE
@@ -252,6 +248,10 @@ extern "C" {
 
 #if FSBL_FORCE_ENC_EXCLUDE_VAL
 #define FSBL_FORCE_ENC_EXCLUDE
+#endif
+
+#if (FSBL_DDR_SR_EXCLUDE_VAL == 0U)
+#define XFSBL_ENABLE_DDR_SR
 #endif
 /************************** Function Prototypes ******************************/
 

@@ -1,6 +1,6 @@
 /******************************************************************************
 *
-* Copyright (C) 2015 - 17 Xilinx, Inc.  All rights reserved.
+* Copyright (C) 2015 - 18 Xilinx, Inc.  All rights reserved.
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -11,10 +11,6 @@
 *
 * The above copyright notice and this permission notice shall be included in
 * all copies or substantial portions of the Software.
-*
-* Use of the Software is limited solely to applications:
-* (a) running on a Xilinx device, or
-* (b) that interact with a Xilinx device through a bus or interconnect.
 *
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -62,6 +58,7 @@
 #include "psu_init.h"
 #include "xfsbl_main.h"
 #include "xfsbl_image_header.h"
+#include "xfsbl_bs.h"
 
 /************************** Constant Definitions *****************************/
 #define XFSBL_CPU_POWER_UP		(0x1U)
@@ -559,11 +556,16 @@ END:
  *****************************************************************************/
 void XFsbl_HandoffExit(u64 HandoffAddress, u32 Flags)
 {
+	u32 RegVal;
 
-	/**
-	 * Flush the L1 data cache and L2 cache, Disable Data Cache
+	/*
+	 * Write 1U to PMU GLOBAL general storage register 5 to indicate
+	 * PMU Firmware that FSBL completed execution
 	 */
-	Xil_DCacheDisable();
+	RegVal = XFsbl_In32(PMU_GLOBAL_GLOB_GEN_STORAGE5);
+	RegVal &= ~XFSBL_EXEC_COMPLETED;
+	RegVal |= XFSBL_EXEC_COMPLETED;
+	XFsbl_Out32(PMU_GLOBAL_GLOB_GEN_STORAGE5, RegVal);
 
 	XFsbl_Printf(DEBUG_GENERAL,"Exit from FSBL \n\r");
 
@@ -749,6 +751,12 @@ u32 XFsbl_Handoff (const XFsblPs * FsblInstancePtr, u32 PartitionNum, u32 EarlyH
 			(void)psu_ps_pl_isolation_removal_data();
 			(void)psu_ps_pl_reset_config_data();
 		}
+
+	/**
+	 * Flush the L1 data cache and L2 cache, Disable Data Cache
+	*/
+	Xil_DCacheDisable();
+
 	if(FsblInstancePtr->ResetReason != XFSBL_APU_ONLY_RESET){
 
 	Status = XFsbl_PmInit();
@@ -775,6 +783,13 @@ u32 XFsbl_Handoff (const XFsblPs * FsblInstancePtr, u32 PartitionNum, u32 EarlyH
 	if (FsblInstancePtr->PrimaryBootDevice ==
 			XFSBL_JTAG_BOOT_MODE)
 	{
+		Status = XFsbl_PLCheckForDone();
+		if(Status==XFSBL_SUCCESS)
+		{
+			/**Remove PS-PL isolation as bitstream is loaded*/
+			(void)psu_ps_pl_isolation_removal_data();
+			(void)psu_ps_pl_reset_config_data();
+		}
 		/**
 		 * Mark Error status with Fsbl completed
 		 */
@@ -783,10 +798,6 @@ u32 XFsbl_Handoff (const XFsblPs * FsblInstancePtr, u32 PartitionNum, u32 EarlyH
 
 		if (XGet_Zynq_UltraMp_Platform_info() == (u32)(0X2U))
 		{
-			/**
-			 * Flush the L1 data cache and L2 cache, Disable Data Cache
-			 */
-			Xil_DCacheDisable();
 			XFsbl_Printf(DEBUG_GENERAL,"Exit from FSBL. \n\r");
 #ifdef ARMA53_64
 			XFsbl_Out32(0xFFFC0000U, 0x14000000U);
@@ -819,13 +830,6 @@ u32 XFsbl_Handoff (const XFsblPs * FsblInstancePtr, u32 PartitionNum, u32 EarlyH
 				"XFSBL_ERROR_HOOK_BEFORE_HANDOFF\r\n");
 		goto END;
 	}
-
-	/**
-	 * Disable Data Cache to have smooth data
-	 * transfer between the processors.
-	 * Data transfer is required to update flag for CPU out of reset
-	 */
-	Xil_DCacheDisable();
 
 	/**
 	 * get cpu out of reset
@@ -1026,8 +1030,10 @@ u32 XFsbl_Handoff (const XFsblPs * FsblInstancePtr, u32 PartitionNum, u32 EarlyH
 	XFsbl_Out32(XFSBL_ERROR_STATUS_REGISTER_OFFSET, XFSBL_COMPLETED);
 
 #ifdef XFSBL_WDT_PRESENT
-	/* Stop WDT as we are exiting FSBL */
-	XFsbl_StopWdt();
+	if (FsblInstancePtr->ResetReason != XFSBL_APU_ONLY_RESET) {
+		/* Stop WDT as we are exiting FSBL */
+		XFsbl_StopWdt();
+	}
 #endif
 
 	/**

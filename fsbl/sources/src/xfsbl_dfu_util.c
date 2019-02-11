@@ -12,10 +12,6 @@
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
  *
- * Use of the Software is limited solely to applications:
- * (a) running on a Xilinx device, or
- * (b) that interact with a Xilinx device through a bus or interconnect.
- *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
@@ -536,7 +532,7 @@ s32 XFsbl_SetConfiguration(SetupPacket *Ctrl)
 
 	UsbInstance.IsConfigDone = 0U;
 
-	switch (UsbInstance.State) {
+	switch (UsbInstance.AppData->State) {
 		case XUSBPSU_STATE_DEFAULT:
 		{
 			Ret = XST_FAILURE;
@@ -545,7 +541,7 @@ s32 XFsbl_SetConfiguration(SetupPacket *Ctrl)
 
 		case XUSBPSU_STATE_ADDRESS:
 		{
-			UsbInstance.State = XUSBPSU_STATE_CONFIGURED;
+			UsbInstance.AppData->State = XUSBPSU_STATE_CONFIGURED;
 			Ret = XST_SUCCESS;
 		}
 			break;
@@ -655,7 +651,7 @@ static void XFsbl_DfuSetState(u32 DfuState) {
  * @note		None.
  *
  ******************************************************************************/
-void XFsbl_DfuReset(struct XUsbPsu* InstancePtr)
+void XFsbl_DfuReset(struct Usb_DevData* InstancePtr)
 {
 	if (DfuObj.DfuWaitForInterrupt == 1U) {
 		/* Tell DFU that we got reset signal */

@@ -1,7 +1,7 @@
 
 
 
-#include <unistd.h>
+//#include <unistd.h>
 #include "avrsysmon2/avrsysmon2.h"
 #include "xfsbl_hw.h"
 #include "xfsbl_debug.h"
@@ -593,7 +593,7 @@ void AVRBootCheck( EBootCheckType eBootType )
 		xil_printf( "\r\n @@@@@@@@@@@@       @@ @@ @@@@ @@   @  @ @@ @@    @@@@  @  @@  @@  @@ @@");
 		xil_printf( "\r\n    @@@@@@");
 		xil_printf( "\r\n" );
-		xil_printf( "\r\nAlpha Data Parallel Systems Ltd. ZynqMP FSBL Release 1.0.1.0" );
+		xil_printf( "\r\nAlpha Data Parallel Systems Ltd. ZynqMP FSBL Release 1.0.2.0" );
 		xil_printf( "\r\n" );
 		usleep(1000000);
 #endif
@@ -946,9 +946,12 @@ avr_done:
 	if( eBootType == BootCheckNormal )
 	{
 		xil_printf( "\r\n" );
-		u32 nBootModeRegister = XFsbl_In32(CRL_APB_BOOT_MODE_USER);
-		nBootModeRegister &= CRL_APB_BOOT_MODE_USER_BOOT_MODE_MASK;
-
+#ifdef XFSBL_OVERRIDE_BOOT_MODE
+		u32 nBootModeRegister = XFSBL_OVERRIDE_BOOT_MODE;
+#else
+		u32 nBootModeRegister = XFsbl_In32(CRL_APB_BOOT_MODE_USER) &
+				CRL_APB_BOOT_MODE_USER_BOOT_MODE_MASK;
+#endif
 		switch( nBootModeRegister )
 		{
 		case XFSBL_JTAG_BOOT_MODE:

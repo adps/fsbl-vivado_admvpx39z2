@@ -1,6 +1,6 @@
 /******************************************************************************
 *
-* Copyright (C) 2015 - 17 Xilinx, Inc.  All rights reserved.
+* Copyright (C) 2015 - 18 Xilinx, Inc.  All rights reserved.
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -11,10 +11,6 @@
 *
 * The above copyright notice and this permission notice shall be included in
 * all copies or substantial portions of the Software.
-*
-* Use of the Software is limited solely to applications:
-* (a) running on a Xilinx device, or
-* (b) that interact with a Xilinx device through a bus or interconnect.
 *
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -48,6 +44,7 @@
 *       jr   01/24/17 Updated XFsbl_PmInit function, to process only
 *                     SYSCFG is enabled and sending PM_SET_CONFIGURATION API
 *                     to the PMU
+* 3.0  bv    08/04/18 Call XWdts_Stop only when WDT timer is in ready state
 *
 * </pre>
 *
@@ -92,7 +89,9 @@
 #endif
 #define PM_INIT_COMPLETED_KEY		0x5A5A5A5AU
 /************************** Function Prototypes ******************************/
+#ifdef XFSBL_WDT_PRESENT
 static u32 XFsbl_ConvertTime_WdtCounter(u32 seconds);
+#endif
 /************************** Variable Definitions *****************************/
 #ifdef XFSBL_WDT_PRESENT
 static XWdtPs Watchdog={0};		/* Instance of WatchDog Timer	*/
@@ -131,7 +130,7 @@ u32 XFsbl_InitWdt(void)
 	 */
 	ConfigPtr = XWdtPs_LookupConfig(XFSBL_WDT_DEVICE_ID);
 
-	if(ConfigPtr==NULL) {
+	if (NULL==ConfigPtr) {
 		UStatus = XFSBL_WDT_INIT_FAILED;
 		goto END;
 	}
@@ -167,14 +166,14 @@ u32 XFsbl_InitWdt(void)
 	 */
 	XWdtPs_EnableOutput(&Watchdog, XWDTPS_RESET_SIGNAL);
 
-	/* Enable generation of system reset by PMU due to LPD SWDT */
+	/* Enable generation of system reset by PMU due to SWDT0/1 */
 	RegValue = XFsbl_In32(PMU_GLOBAL_ERROR_SRST_EN_1);
-	RegValue |= PMU_GLOBAL_ERROR_SRST_EN_1_LPD_SWDT_MASK;
+	RegValue |= XFSBL_WDT_MASK;
 	XFsbl_Out32(PMU_GLOBAL_ERROR_SRST_EN_1, RegValue);
 
-	/* Enable LPD System Watchdog Timer Error */
+	/* Enable SWDT0/1 System Watchdog Timer Error */
 	RegValue = XFsbl_In32(PMU_GLOBAL_ERROR_EN_1);
-	RegValue |= PMU_GLOBAL_ERROR_EN_1_LPD_SWDT_MASK;
+	RegValue |= XFSBL_WDT_MASK;
 	XFsbl_Out32(PMU_GLOBAL_ERROR_EN_1, RegValue);
 
 	/**
@@ -264,16 +263,18 @@ void XFsbl_StopWdt(void)
 {
 	u32 RegValue;
 
-	XWdtPs_Stop(&Watchdog);
+	if (Watchdog.IsReady) {
+		XWdtPs_Stop(&Watchdog);
+	}
 
-	/* Disable LPD System Watchdog Timer Error */
+	/* Disable SWDT0/1 System Watchdog Timer Error */
 	RegValue = XFsbl_In32(PMU_GLOBAL_ERROR_EN_1);
-	RegValue &= ~(PMU_GLOBAL_ERROR_EN_1_LPD_SWDT_MASK);
+	RegValue &= ~(XFSBL_WDT_MASK);
 	XFsbl_Out32(PMU_GLOBAL_ERROR_EN_1, RegValue);
 
-	/* Disable generation of system reset by PMU due to LPD SWDT */
+	/* Disable generation of system reset by PMU due to SWDT0/1 */
 	RegValue = XFsbl_In32(PMU_GLOBAL_ERROR_SRST_DIS_1);
-	RegValue |= PMU_GLOBAL_ERROR_SRST_DIS_1_LPD_SWDT_MASK;
+	RegValue |= XFSBL_WDT_MASK;
 	XFsbl_Out32(PMU_GLOBAL_ERROR_SRST_DIS_1, RegValue);
 }
 
@@ -310,12 +311,6 @@ u32 XFsbl_PmInit(void)
 #endif
 
 	/**
-	 * Mark to the PMU that FSBL has completed with system initialization
-	 * This is needed for the JTAG boot mode
-	 */
-	Xil_Out32(PMU_GLOBAL_PERS_GLOB_GEN_STORAGE5, PM_INIT_COMPLETED_KEY);
-
-	/**
 	 * Check if PMU FW is present
 	 * If PMU FW is present, but IPI device does not exist, report an error
 	 * If IPI device exists, but PMU FW is not present, do not issue IPI
@@ -323,6 +318,7 @@ u32 XFsbl_PmInit(void)
 	if ((XFsbl_In32(PMU_GLOBAL_GLOBAL_CNTRL) &
 			PMU_GLOBAL_GLOBAL_CNTRL_FW_IS_PRESENT_MASK) !=
 				PMU_GLOBAL_GLOBAL_CNTRL_FW_IS_PRESENT_MASK) {
+		XFsbl_Printf(DEBUG_PRINT_ALWAYS,"PMU-FW is not running, certain applications may not be supported.\n\r");
 		UStatus = XFSBL_SUCCESS;
 		goto END;
 	}

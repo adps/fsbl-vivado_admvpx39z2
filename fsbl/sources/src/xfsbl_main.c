@@ -1,6 +1,6 @@
 /******************************************************************************
 *
-* Copyright (C) 2015 - 17 Xilinx, Inc.  All rights reserved.
+* Copyright (C) 2015 - 18 Xilinx, Inc.  All rights reserved.
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
@@ -11,10 +11,6 @@
 *
 * The above copyright notice and this permission notice shall be included in
 * all copies or substantial portions of the Software.
-*
-* Use of the Software is limited solely to applications:
-* (a) running on a Xilinx device, or
-* (b) that interact with a Xilinx device through a bus or interconnect.
 *
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -57,16 +53,8 @@
 #include "xfsbl_hw.h"
 #include "xfsbl_main.h"
 #include "bspconfig.h"
-//#include "emmc_test.h"
-//#include "xdppsu_common_example.h"
-//#include "xdppsu_poll_example.h"
-//#include "xdppsu_intr_example.h"
-//#include "xdpdma_video_example.h"
 #include "avrboot.h"
-//#include "fatbit.h"
 #include "xemacps.h"
-
-//#pragma GCC optimize ("O0")
 
 /************************** Constant Definitions *****************************/
 
@@ -77,6 +65,7 @@
 /************************** Function Prototypes ******************************/
 static void XFsbl_UpdateMultiBoot(u32 MultiBootValue);
 static void XFsbl_FallBack(void);
+static void XFsbl_MarkUsedRPUCores(XFsblPs *FsblInstPtr, u32 PartitionNum);
 u32 EthernetPhyEnable(u32 nGEMAddr);
 
 /************************** Variable Definitions *****************************/
@@ -96,10 +85,18 @@ int main(void )
 	 */
 	u32 FsblStatus = XFSBL_SUCCESS;
 	u32 FsblStage = XFSBL_STAGE1;
-	u32 PartitionNum = 0U;
+	u32 PartitionNum=0U;
 	u32 EarlyHandoff = FALSE;
 #ifdef XFSBL_PERF
 	XTime tCur = 0;
+#endif
+#ifdef ENABLE_POS
+	u32 WarmBoot;
+
+	WarmBoot = XFsbl_HookGetPosBootType();
+	if (0U != WarmBoot) {
+		XFsbl_HandoffExit(0U, XFSBL_NO_HANDOFFEXIT);
+	}
 #endif
 
 #if defined(EL3) && (EL3 != 1)
@@ -129,6 +126,7 @@ int main(void )
 
 					EthernetPhyEnable(0xFF0C0000);
 					EthernetPhyEnable(0xFF0E0000);
+
 					/**
 					 *
 					 * Include the code for FSBL time measurements
@@ -137,7 +135,7 @@ int main(void )
 
 					FsblStage = XFSBL_STAGE2;
 				}
-			} break;
+			}break;
 
 		case XFSBL_STAGE2:
 			{
@@ -162,8 +160,8 @@ int main(void )
 				usleep(200000);
 				AVRBootCheck( BootCheckVPD );
 				AVRBootCheck( BootCheckNormal );
+
 				FsblStatus = XFsbl_BootDeviceInitAndValidate(&FsblInstance);
-				//AVRBootCheck( BootCheckVPD );
 				if ( (XFSBL_SUCCESS != FsblStatus) &&
 						(XFSBL_STATUS_JTAG != FsblStatus) )
 				{
@@ -172,14 +170,19 @@ int main(void )
 					FsblStatus += XFSBL_ERROR_STAGE_2;
 					FsblStage = XFSBL_STAGE_ERR;
 				} else if (XFSBL_STATUS_JTAG == FsblStatus) {
+
+					/*
+					 * Mark RPU cores as usable in JTAG boot
+					 * mode.
+					 */
+					Xil_Out32(XFSBL_R5_USAGE_STATUS_REG,
+						  (Xil_In32(XFSBL_R5_USAGE_STATUS_REG) |
+						   (XFSBL_R5_0_STATUS_MASK |
+						    XFSBL_R5_1_STATUS_MASK)));
+
 					/**
 					 * This is JTAG boot mode, go to the handoff stage
 					 */
-
-				    //emmcTest();
-					//XFsbl_Printf(DEBUG_PRINT_ALWAYS,"Running DP poll example\r\n");
-					//DpPsu_PollExample(&DpPsuInstance, DPPSU_DEVICE_ID);
-
 					FsblStage = XFSBL_STAGE4;
 				} else {
 					XFsbl_Printf(DEBUG_INFO,"Initialization Success \n\r");
@@ -189,6 +192,12 @@ int main(void )
 					 * 0th partition will be FSBL
 					 */
 					PartitionNum = 0x1U;
+
+					/* Clear RPU status register */
+					Xil_Out32(XFSBL_R5_USAGE_STATUS_REG,
+						  (Xil_In32(XFSBL_R5_USAGE_STATUS_REG) &
+						  ~(XFSBL_R5_0_STATUS_MASK |
+						    XFSBL_R5_1_STATUS_MASK)));
 
 					FsblStage = XFSBL_STAGE3;
 				}
@@ -204,6 +213,7 @@ int main(void )
 				XFsbl_Printf(DEBUG_INFO,
 					"======= In Stage 3, Partition No:%d ======= \n\r",
 					PartitionNum);
+
 				/**
 				 * Load the partitions
 				 *  image header
@@ -224,6 +234,9 @@ int main(void )
 				} else {
 					XFsbl_Printf(DEBUG_INFO,"Partition %d Load Success \n\r",
 									PartitionNum);
+
+					XFsbl_MarkUsedRPUCores(&FsblInstance,
+							       PartitionNum);
 					/**
 					 * Check loading all partitions is completed
 					 */
@@ -250,11 +263,6 @@ int main(void )
 						 */
 						XFsbl_Printf(DEBUG_INFO,"All Partitions Loaded \n\r");
 
-						//XFsbl_Printf(DEBUG_PRINT_ALWAYS,"Running DP example\r\n");
-						//DpPsu_PollExample(&DpPsuInstance, DPPSU_DEVICE_ID);
-						//DpPsu_IntrExample();
-						//DpdmaVideoExample();
-
 #ifdef XFSBL_PERF
 						XFsbl_MeasurePerfTime(FsblInstance.PerfTime.tFsblStart);
 						XFsbl_Printf(DEBUG_PRINT_ALWAYS, ": Total Time \n\r");
@@ -265,7 +273,6 @@ int main(void )
 
 					}
 				} /* End of else loop for Load Success */
-
 			} break;
 
 		case XFSBL_STAGE4:
@@ -307,7 +314,6 @@ int main(void )
 					 */
 					FsblStage = XFSBL_STAGE_DEFAULT;
 				}
-
 			} break;
 
 		case XFSBL_STAGE_ERR:
@@ -335,7 +341,6 @@ int main(void )
 				 * Exit FSBL
 				 */
 				XFsbl_HandoffExit(0U, XFSBL_NO_HANDOFFEXIT);
-
 
 			}break;
 
@@ -366,9 +371,9 @@ void XFsbl_PrintFsblBanner(void )
 	 */
 #if !defined(XFSBL_PERF) || defined(FSBL_DEBUG) || defined(FSBL_DEBUG_INFO) \
 			|| defined(FSBL_DEBUG_DETAILED)
-	XFsbl_Printf(DEBUG_INFO,
+	XFsbl_Printf(DEBUG_PRINT_ALWAYS,
                  "Xilinx Zynq MP First Stage Boot Loader \n\r");
-	XFsbl_Printf(DEBUG_INFO,
+	XFsbl_Printf(DEBUG_PRINT_ALWAYS,
                  "Release %d.%d   %s  -  %s\r\n",
                  SDK_RELEASE_YEAR, SDK_RELEASE_QUARTER,__DATE__,__TIME__);
 
@@ -412,6 +417,7 @@ void XFsbl_PrintFsblBanner(void )
 }
 
 
+
 /*****************************************************************************/
 /**
  * This function is called in FSBL error cases. Error status
@@ -444,14 +450,8 @@ void XFsbl_ErrorLockDown(u32 ErrorStatus)
 	/**
 	 * Read Boot Mode register
 	 */
-	//Allow software override of the 9z2 boot mode to avoid having to
-	//solder the boot mode select resistor
-#ifdef XFSBL_OVERRIDE_BOOT_MODE
-	BootMode = XFSBL_OVERRIDE_BOOT_MODE;
-#else
 	BootMode = XFsbl_In32(CRL_APB_BOOT_MODE_USER) &
 			CRL_APB_BOOT_MODE_USER_BOOT_MODE_MASK;
-#endif
 
 	/**
 	 * Fallback if bootmode supports
@@ -500,8 +500,10 @@ static void XFsbl_FallBack(void)
 	u32 RegValue;
 
 #ifdef XFSBL_WDT_PRESENT
-	/* Stop WDT as we are restarting */
-	XFsbl_StopWdt();
+	if (FsblInstance.ResetReason != XFSBL_APU_ONLY_RESET) {
+		/* Stop WDT as we are restarting */
+		XFsbl_StopWdt();
+	}
 #endif
 
 	/* Hook before FSBL Fallback */
@@ -615,6 +617,39 @@ void XFsbl_MeasurePerfTime(XTime tCur)
 }
 
 #endif
+
+static void XFsbl_MarkUsedRPUCores(XFsblPs *FsblInstPtr, u32 PartitionNum)
+{
+	u32 DestCpu, RegValue;
+
+	DestCpu = XFsbl_GetDestinationCpu(&FsblInstPtr->ImageHeader.
+					  PartitionHeader[PartitionNum]);
+
+	RegValue = Xil_In32(XFSBL_R5_USAGE_STATUS_REG);
+
+	/*
+	 * Check if any RPU core is used. If it is used set particular bit of
+	 * that core to indicate PMU that it is used and it is not need to
+	 * power down.
+	 */
+	switch (DestCpu) {
+	case XIH_PH_ATTRB_DEST_CPU_R5_0:
+	case XIH_PH_ATTRB_DEST_CPU_R5_L:
+		Xil_Out32(XFSBL_R5_USAGE_STATUS_REG, RegValue |
+			  XFSBL_R5_0_STATUS_MASK);
+		break;
+	case XIH_PH_ATTRB_DEST_CPU_R5_1:
+		Xil_Out32(XFSBL_R5_USAGE_STATUS_REG, RegValue |
+			  XFSBL_R5_1_STATUS_MASK);
+		break;
+	case XIH_PH_ATTRB_DEST_CPU_NONE:
+		if ((FsblInstance.ProcessorID == XIH_PH_ATTRB_DEST_CPU_R5_0) ||
+		    (FsblInstance.ProcessorID == XIH_PH_ATTRB_DEST_CPU_R5_L)) {
+			Xil_Out32(XFSBL_R5_USAGE_STATUS_REG, RegValue |
+				  XFSBL_R5_0_STATUS_MASK);
+		}
+	}
+}
 
 
 

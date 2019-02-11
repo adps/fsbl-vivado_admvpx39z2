@@ -12,10 +12,6 @@
 * The above copyright notice and this permission notice shall be included in
 * all copies or substantial portions of the Software.
 *
-* Use of the Software is limited solely to applications:
-* (a) running on a Xilinx device, or
-* (b) that interact with a Xilinx device through a bus or interconnect.
-*
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
@@ -42,6 +38,10 @@
 * Ver   Who     Date     Changes
 * ----- ------  -------- -----------------------------------------------------
 * 1.0   vns     01/28/17 First release
+* 2.0   vns     11/09/17 In structure XFsblPs_PlPartition added member
+*                        (SecureHdr) to store partial secure header when
+*                        single secure header is in two chunks, also added
+*                        another member(Hdr) to store size of data stored.
 * </pre>
 *
 ******************************************************************************/
@@ -104,6 +104,8 @@ typedef struct {
 				/**< Device copy for DDR less system */
 	XFsblPs_PlEncryption PlEncrypt;	/**< Encryption parameters */
 	XFsblPs_PlAuthentication PlAuth;/**< Authentication parameters */
+	u8 SecureHdr[XSECURE_SECURE_HDR_SIZE + XSECURE_SECURE_GCM_TAG_SIZE];
+	u8 Hdr;
 } XFsblPs_PlPartition;
 /*@}*/
 

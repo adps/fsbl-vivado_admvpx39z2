@@ -12,10 +12,6 @@
 * The above copyright notice and this permission notice shall be included in
 * all copies or substantial portions of the Software.
 *
-* Use of the Software is limited solely to applications:
-* (a) running on a Xilinx device, or
-* (b) that interact with a Xilinx device through a bus or interconnect.
-*
 * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
@@ -72,8 +68,6 @@ extern "C" {
 
 /************************** Variable Definitions *****************************/
 
-//#define XFSBL_OVERRIDE_BOOT_MODE XFSBL_SD0_BOOT_MODE
-
 /**
  * Debug levels for FSBL
  */
@@ -81,8 +75,6 @@ extern "C" {
 #define DEBUG_GENERAL	      (0x00000002U)    /* general debug  messages */
 #define DEBUG_INFO	      (0x00000004U)    /* More debug information */
 #define DEBUG_DETAILED	      (0x00000008U)    /* More debug information */
-
-//#define FSBL_DEBUG_DETAILED
 
 #if defined (FSBL_DEBUG_DETAILED)
 #define XFsblDbgCurrentTypes ((DEBUG_DETAILED) | (DEBUG_INFO) | \

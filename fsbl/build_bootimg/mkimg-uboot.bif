@@ -1,8 +1,0 @@
-//arch = zynqmp; split = false; format = BIN
-the_ROM_image:
-{
-	[destination_cpu = a53-0, bootloader]../9z2_workspace/9z2_fsbl/Debug/9z2_fsbl.elf
-	[destination_cpu = a53-0, exception_level = el-3, trustzone]./bl31.elf
-	[destination_cpu = a53-0, exception_level = el-2]./u-boot.elf
-	[pmufw_image]../9z2_workspace/9z2_pmufw/Debug/9z2_pmufw.elf
-}

@@ -1,7 +1,0 @@
-//arch = zynqmp; split = false; format = BIN
-the_ROM_image:
-{
-	[fsbl_config]a53_x64
-	[bootloader]F:\svn_repo\ch_repo\ZynqMPSoC\xsdk\9z2_workspace\9z2_fsbl\Debug\9z2_fsbl.elf
-	[destination_cpu = a53-0]F:\svn_repo\ch_repo\ZynqMPSoC\xsdk\9z2_workspace\9z2_ddr4_test\Debug\9z2_ddr4_test.elf
-}
