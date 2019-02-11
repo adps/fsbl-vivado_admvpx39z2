@@ -2313,6 +2313,8 @@ move_dashboard_gadget -name {methodology_1} -row 2 -col 1
 # Set current dashboard to 'default_dashboard' 
 current_dashboard default_dashboard 
 
-launch_runs impl_1 -to_step write_bitstream -jobs 4
+launch_runs impl_1 -jobs 4
+wait_on_run -timeout 60 impl_1
 
+launch_runs impl_1 -to_step write_bitstream -jobs 4
 wait_on_run -timeout 60 impl_1
