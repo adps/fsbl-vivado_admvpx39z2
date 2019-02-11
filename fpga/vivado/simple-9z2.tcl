@@ -2314,3 +2314,5 @@ move_dashboard_gadget -name {methodology_1} -row 2 -col 1
 current_dashboard default_dashboard 
 
 launch_runs impl_1 -to_step write_bitstream -jobs 4
+
+wait_on_run -timeout 60 impl_1
