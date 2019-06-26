@@ -773,7 +773,7 @@ u32 EthernetPhyEnable(u32 nGEMAddr)
     /*************************************************************************
      * Return page register to their original state                          *
      *************************************************************************/
-	if( XEmacPs_PhyWrite(&InstancePtr, 1, 22, 0) != XST_SUCCESS)
+	if( XEmacPs_PhyWrite(&InstancePtr, 0, 22, 0) != XST_SUCCESS)
 	{
 		xil_printf("Error setting Ethernet phy mode.\r\n");
 		return XST_FAILURE;
