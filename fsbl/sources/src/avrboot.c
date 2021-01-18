@@ -593,7 +593,7 @@ void AVRBootCheck( EBootCheckType eBootType )
 		xil_printf( "\r\n @@@@@@@@@@@@       @@ @@ @@@@ @@   @  @ @@ @@    @@@@  @  @@  @@  @@ @@");
 		xil_printf( "\r\n    @@@@@@");
 		xil_printf( "\r\n" );
-		xil_printf( "\r\nAlpha Data Parallel Systems Ltd. ZynqMP FSBL Release 1.0.2.0" );
+		xil_printf( "\r\nAlpha Data Parallel Systems Ltd. ZynqMP FSBL Release 1.0.2.2" );
 		xil_printf( "\r\n" );
 		usleep(1000000);
 #endif
