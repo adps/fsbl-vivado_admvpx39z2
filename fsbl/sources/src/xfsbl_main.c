@@ -124,9 +124,6 @@ int main(void )
 					FsblStage = XFSBL_STAGE_ERR;
 				} else {
 
-					EthernetPhyEnable(0xFF0C0000);
-					EthernetPhyEnable(0xFF0E0000);
-
 					/**
 					 *
 					 * Include the code for FSBL time measurements
@@ -280,6 +277,9 @@ int main(void )
 
 				XFsbl_Printf(DEBUG_INFO,
 						"================= In Stage 4 ============ \n\r");
+
+				EthernetPhyEnable(0xFF0C0000);
+				EthernetPhyEnable(0xFF0E0000);
 
 				/**
 				 * Handoff to the applications
